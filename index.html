@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Generative Music Engine & Sound Design</title>
+    <title>Generative Hooktheory Engine & Sound Design</title>
     <style>
         :root {
             --bg-color: #f4f6f8;
@@ -25,7 +25,7 @@
             padding: 0;
             font-family: var(--font-mono);
             user-select: none;
-            touch-action: manipulation;
+            touch-action: manipulation; /* Prevents double-tap zooming */
         }
 
         body {
@@ -283,10 +283,11 @@
 
         <div class="panel">
             <div class="panel-header">
-                GENRE PRESETS — ACTIVE: <span style="color: var(--accent-purple)" id="genreDisplay">JAZZ</span>
+                HOOKTHEORY GENRES — ACTIVE: <span style="color: var(--accent-purple)" id="genreDisplay">POP</span>
             </div>
             <div class="btn-group" id="genreButtons">
-                <div class="btn-chip active" data-genre="JAZZ">JAZZ</div>
+                <div class="btn-chip active" data-genre="POP">POP</div>
+                <div class="btn-chip" data-genre="JAZZ">JAZZ</div>
                 <div class="btn-chip" data-genre="LOFI">LO-FI</div>
                 <div class="btn-chip" data-genre="SYNTHWAVE">SYNTHWAVE</div>
                 <div class="btn-chip" data-genre="CLASSICAL">CLASSICAL</div>
@@ -294,7 +295,6 @@
                 <div class="btn-chip" data-genre="FUNK">FUNK</div>
                 <div class="btn-chip" data-genre="ROCK">ROCK</div>
                 <div class="btn-chip" data-genre="BLUES">BLUES</div>
-                <div class="btn-chip" data-genre="POP">POP</div>
                 <div class="btn-chip" data-genre="EDM">EDM</div>
             </div>
         </div>
@@ -315,8 +315,8 @@
             <div class="control-group">
                 <div class="control-label"><span>FILTER CUTOFF FREQUENCY</span></div>
                 <div class="slider-container">
-                    <input type="range" id="cutoffSlider" min="200" max="8000" value="2500">
-                    <span class="slider-val" id="cutoffVal">2500Hz</span>
+                    <input type="range" id="cutoffSlider" min="200" max="8000" value="2800">
+                    <span class="slider-val" id="cutoffVal">2800Hz</span>
                 </div>
             </div>
 
@@ -353,10 +353,10 @@
                         <option value="11">B</option>
                     </select>
                     <select id="scaleSelect">
-                        <option value="major">Major</option>
+                        <option value="major" selected>Major</option>
                         <option value="minor">Minor</option>
                         <option value="pentatonic">Pentatonic</option>
-                        <option value="dorian" selected>Dorian</option>
+                        <option value="dorian">Dorian</option>
                         <option value="blues">Blues Scale</option>
                     </select>
                 </div>
@@ -365,8 +365,8 @@
             <div class="control-group">
                 <div class="control-label"><span>TEMPO</span></div>
                 <div class="slider-container">
-                    <input type="range" id="tempoSlider" min="50" max="180" value="110">
-                    <span class="slider-val" id="tempoVal" style="color:var(--text-main)">110bpm</span>
+                    <input type="range" id="tempoSlider" min="50" max="180" value="120">
+                    <span class="slider-val" id="tempoVal" style="color:var(--text-main)">120bpm</span>
                 </div>
             </div>
 
@@ -386,7 +386,7 @@
                 </div>
             </div>
             <div class="description-text">
-                Press <b>REC MIDI</b> while running to capture lead, chord, and bass lines. Click REC again to stop recording and instantly download the multitrack <code>.mid</code> file for your DAW.
+                Press <b>REC MIDI</b> while playing. Upon stopping, a synchronized multitrack <code>.mid</code> file is generated with <b>equal track lengths</b> ready for DAW import.
             </div>
         </div>
     </div>
@@ -399,8 +399,8 @@
     let isPlaying = false;
     let isRecording = false;
 
-    let currentGenre = 'JAZZ';
-    let tempo = 110;
+    let currentGenre = 'POP';
+    let tempo = 120;
     let playTimer = null;
     let currentStep = 0;
     
@@ -409,14 +409,15 @@
 
     // Synth Parameters
     let leadWave = 'triangle';
-    let filterCutoff = 2500;
+    let filterCutoff = 2800;
     let attackTime = 0.02;
     let releaseTime = 0.4;
 
-    // MIDI Recording Buffers (Raw MIDI pitch numbers)
-    let recordedLeadEvents = [];
-    let recordedChordEvents = [];
-    let recordedBassEvents = [];
+    // Recording Session Tracker
+    let totalRecordedSteps = 0;
+    let recordedLeadEvents = [];  // { stepIndex, pitch, durationInSteps }
+    let recordedChordEvents = []; // { stepIndex, pitches, durationInSteps }
+    let recordedBassEvents = [];  // { stepIndex, pitch, durationInSteps }
 
     const SCALES = {
         major: [0, 2, 4, 5, 7, 9, 11],
@@ -426,17 +427,18 @@
         blues: [0, 3, 5, 6, 7, 10]
     };
 
-    const GENRE_PRESETS = {
-        JAZZ: { scale: 'dorian', tempo: 110, rho: 28.0, wave: 'triangle', chordType: '7th9th' },
-        LOFI: { scale: 'major', tempo: 75, rho: 18.0, wave: 'sine', chordType: '7th' },
-        SYNTHWAVE: { scale: 'minor', tempo: 124, rho: 32.0, wave: 'sawtooth', chordType: 'triad' },
-        CLASSICAL: { scale: 'major', tempo: 90, rho: 22.0, wave: 'triangle', chordType: 'triad' },
-        AMBIENT: { scale: 'pentatonic', tempo: 60, rho: 14.0, wave: 'sine', chordType: '7th9th' },
-        FUNK: { scale: 'dorian', tempo: 115, rho: 35.0, wave: 'square', chordType: '7th' },
-        ROCK: { scale: 'minor', tempo: 130, rho: 38.0, wave: 'sawtooth', chordType: 'power' },
-        BLUES: { scale: 'blues', tempo: 95, rho: 26.0, wave: 'square', chordType: '7th' },
-        POP: { scale: 'major', tempo: 120, rho: 24.0, wave: 'triangle', chordType: 'triad' },
-        EDM: { scale: 'minor', tempo: 128, rho: 40.0, wave: 'sawtooth', chordType: 'triad' }
+    // Hooktheory-style standard relative scale degree progressions
+    const HOOKTHEORY_PRESETS = {
+        POP: { progression: [1, 5, 6, 4], scale: 'major', tempo: 120, rho: 24.0, wave: 'triangle', chordType: 'triad' },       // I - V - vi - IV
+        JAZZ: { progression: [2, 5, 1, 6], scale: 'dorian', tempo: 110, rho: 28.0, wave: 'triangle', chordType: '7th9th' },    // ii7 - V7 - Imaj7 - vi7
+        LOFI: { progression: [1, 4, 3, 6], scale: 'major', tempo: 75, rho: 18.0, wave: 'sine', chordType: '7th' },           // Imaj7 - IVmaj7 - iii7 - vi7
+        SYNTHWAVE: { progression: [1, 6, 3, 7], scale: 'minor', tempo: 124, rho: 32.0, wave: 'sawtooth', chordType: 'triad' }, // i - VI - III - VII
+        CLASSICAL: { progression: [1, 4, 5, 1], scale: 'major', tempo: 90, rho: 22.0, wave: 'triangle', chordType: 'triad' },   // I - IV - V - I
+        AMBIENT: { progression: [1, 6, 4, 5], scale: 'pentatonic', tempo: 60, rho: 14.0, wave: 'sine', chordType: '7th9th' }, // I - vi - IV - V
+        FUNK: { progression: [1, 4, 1, 5], scale: 'dorian', tempo: 115, rho: 35.0, wave: 'square', chordType: '7th' },        // I7 - IV7 - I7 - V7
+        ROCK: { progression: [1, 7, 6, 7], scale: 'minor', tempo: 130, rho: 38.0, wave: 'sawtooth', chordType: 'power' },      // i - VII - VI - VII
+        BLUES: { progression: [1, 4, 1, 5], scale: 'blues', tempo: 95, rho: 26.0, wave: 'square', chordType: '7th' },        // I7 - IV7 - I7 - V7
+        EDM: { progression: [6, 4, 1, 5], scale: 'minor', tempo: 128, rho: 40.0, wave: 'sawtooth', chordType: 'triad' }        // vi - IV - I - V
     };
 
     function mtof(midi) {
@@ -495,44 +497,30 @@
         const rootKey = parseInt(document.getElementById('rootSelect').value) + 48;
         const scaleType = document.getElementById('scaleSelect').value;
         const intervals = SCALES[scaleType] || SCALES.major;
-        const genreConfig = GENRE_PRESETS[currentGenre];
+        const preset = HOOKTHEORY_PRESETS[currentGenre];
 
-        // --- 1. LEAD MELODY ---
-        const stepMove = Math.round(lx) % 3;
-        let newNoteIdx = intervals.indexOf((lastMelodyNote - rootKey) % 12);
-        if (newNoteIdx === -1) newNoteIdx = 0;
-
-        newNoteIdx = (newNoteIdx + stepMove + intervals.length) % intervals.length;
-        const octave = 12 * (Math.floor(Math.abs(lz) % 2) + 1);
-        const melodyMidi = rootKey + octave + intervals[newNoteIdx];
-        lastMelodyNote = melodyMidi;
-
-        playSynthTone(mtof(melodyMidi), leadWave, 0.25, 0.18);
-
-        if (isRecording) {
-            recordedLeadEvents.push({ pitch: melodyMidi, step: recordedLeadEvents.length });
+        // --- 1. HARMONY & CHORDS (Hooktheory Progression Mapping) ---
+        const barIndex = Math.floor(currentStep / 4) % preset.progression.length;
+        const chordDegree = preset.progression[barIndex] - 1; // 0-based scale degree
+        const chordRootMidi = rootKey + intervals[chordDegree % intervals.length];
+        
+        let chordNotes = [];
+        if (preset.chordType === '7th9th') {
+            chordNotes = [chordRootMidi, chordRootMidi + 4, chordRootMidi + 7, chordRootMidi + 11, chordRootMidi + 14];
+        } else if (preset.chordType === '7th') {
+            chordNotes = [chordRootMidi, chordRootMidi + 4, chordRootMidi + 7, chordRootMidi + 10];
+        } else if (preset.chordType === 'power') {
+            chordNotes = [chordRootMidi, chordRootMidi + 7, chordRootMidi + 12];
+        } else {
+            chordNotes = [chordRootMidi, chordRootMidi + 4, chordRootMidi + 7];
         }
 
-        // --- 2. HARMONY & CHORDS (Bar Boundaries) ---
+        // Trigger Chord & Bass on Bar Boundaries (Every 4 steps)
         if (currentStep % 4 === 0) {
-            const chordRootDegree = Math.abs(Math.floor(ly)) % intervals.length;
-            const chordRootMidi = rootKey + intervals[chordRootDegree];
-            let chordNotes = [];
-
-            if (genreConfig.chordType === '7th9th') {
-                chordNotes = [chordRootMidi, chordRootMidi + 4, chordRootMidi + 7, chordRootMidi + 11, chordRootMidi + 14];
-            } else if (genreConfig.chordType === '7th') {
-                chordNotes = [chordRootMidi, chordRootMidi + 4, chordRootMidi + 7, chordRootMidi + 10];
-            } else if (genreConfig.chordType === 'power') {
-                chordNotes = [chordRootMidi, chordRootMidi + 7, chordRootMidi + 12];
-            } else {
-                chordNotes = [chordRootMidi, chordRootMidi + 4, chordRootMidi + 7];
-            }
-
             if (chordsEnabled) {
                 chordNotes.forEach(midi => playSynthTone(mtof(midi), 'sine', 1.2, 0.06));
                 if (isRecording) {
-                    recordedChordEvents.push({ pitches: chordNotes });
+                    recordedChordEvents.push({ stepIndex: totalRecordedSteps, pitches: chordNotes, durationInSteps: 4 });
                 }
             }
 
@@ -540,11 +528,34 @@
                 const bassMidi = chordRootMidi - 12;
                 playSynthTone(mtof(bassMidi), 'sawtooth', 0.8, 0.14);
                 if (isRecording) {
-                    recordedBassEvents.push({ pitch: bassMidi });
+                    recordedBassEvents.push({ stepIndex: totalRecordedSteps, pitch: bassMidi, durationInSteps: 4 });
                 }
             }
         }
 
+        // --- 2. LEAD MELODY (Voice Leading with Consonance) ---
+        const stepMove = Math.round(lx) % 3;
+        let newNoteIdx = intervals.indexOf((lastMelodyNote - rootKey) % 12);
+        if (newNoteIdx === -1) newNoteIdx = 0;
+
+        // Downbeats land on chord tones for harmonic strength
+        if (currentStep % 4 === 0) {
+            newNoteIdx = chordDegree;
+        } else {
+            newNoteIdx = (newNoteIdx + stepMove + intervals.length) % intervals.length;
+        }
+
+        const octave = 12 * (Math.floor(Math.abs(lz) % 2) + 1);
+        const melodyMidi = rootKey + octave + intervals[newNoteIdx];
+        lastMelodyNote = melodyMidi;
+
+        playSynthTone(mtof(melodyMidi), leadWave, 0.25, 0.18);
+
+        if (isRecording) {
+            recordedLeadEvents.push({ stepIndex: totalRecordedSteps, pitch: melodyMidi, durationInSteps: 1 });
+        }
+
+        if (isRecording) totalRecordedSteps++;
         currentStep = (currentStep + 1) % 16;
     }
 
@@ -570,7 +581,7 @@
         btnRun.classList.remove('active');
     }
 
-    // --- PURE JS MULTITRACK BINARY MIDI EXPORTER ---
+    // --- SYNCHRONIZED MULTITRACK BINARY MIDI EXPORTER ---
     function writeVarInt(val) {
         let buffer = [];
         let num = val;
@@ -583,19 +594,66 @@
         return buffer;
     }
 
-    function buildTrackChunk(events) {
-        let bytes = [];
-        // Track Name / Header events
-        bytes.push(0x00, 0xFF, 0x2F, 0x00); // End of track default placeholder
-
+    function buildTrackChunk(events, totalSteps, isChordTrack = false) {
+        const ticksPerStep = 96; // 8th note grid
         let trackBytes = [];
-        events.forEach(evt => {
-            // Delta time 0, Note On
-            trackBytes.push(0x00, 0x90, evt.pitch, 0x64);
-            // Delta time 96 (8th note ticks), Note Off
-            trackBytes.push(...writeVarInt(96), 0x80, evt.pitch, 0x00);
-        });
-        trackBytes.push(0x00, 0xFF, 0x2F, 0x00); // End of Track
+        let currentTick = 0;
+
+        if (isChordTrack) {
+            // Group chord notes occurring at the same step
+            const stepGroups = {};
+            events.forEach(evt => {
+                if (!stepGroups[evt.stepIndex]) stepGroups[evt.stepIndex] = { pitches: evt.pitches, durationInSteps: evt.durationInSteps };
+            });
+
+            Object.keys(stepGroups).sort((a, b) => a - b).forEach(sIdx => {
+                const step = parseInt(sIdx);
+                const group = stepGroups[sIdx];
+                const startTick = step * ticksPerStep;
+                const deltaOn = startTick - currentTick;
+
+                // Note On for all chord notes
+                group.pitches.forEach((pitch, i) => {
+                    const delta = (i === 0) ? deltaOn : 0;
+                    trackBytes.push(...writeVarInt(delta), 0x90, pitch, 0x64);
+                });
+
+                const durTicks = group.durationInSteps * ticksPerStep;
+                // Note Off for all chord notes
+                group.pitches.forEach((pitch, i) => {
+                    const delta = (i === 0) ? durTicks : 0;
+                    trackBytes.push(...writeVarInt(delta), 0x80, pitch, 0x00);
+                });
+
+                currentTick = startTick + durTicks;
+            });
+        } else {
+            // Single-note track (Lead & Bass)
+            events.forEach(evt => {
+                const startTick = evt.stepIndex * ticksPerStep;
+                const deltaOn = startTick - currentTick;
+                const durTicks = evt.durationInSteps * ticksPerStep;
+
+                // Note On
+                trackBytes.push(...writeVarInt(deltaOn), 0x90, evt.pitch, 0x64);
+                // Note Off
+                trackBytes.push(...writeVarInt(durTicks), 0x80, evt.pitch, 0x00);
+
+                currentTick = startTick + durTicks;
+            });
+        }
+
+        // Align track length to exact total recording duration
+        const totalDurationTicks = totalSteps * ticksPerStep;
+        if (currentTick < totalDurationTicks) {
+            const padDelta = totalDurationTicks - currentTick;
+            trackBytes.push(...writeVarInt(padDelta));
+        } else {
+            trackBytes.push(0x00);
+        }
+
+        // End of Track meta event
+        trackBytes.push(0xFF, 0x2F, 0x00);
 
         const len = trackBytes.length;
         const header = [
@@ -610,26 +668,22 @@
     }
 
     function exportMultitrackMidi() {
-        if (recordedLeadEvents.length === 0) {
+        if (totalRecordedSteps === 0 || recordedLeadEvents.length === 0) {
             alert("No MIDI notes recorded yet. Press RUN and REC MIDI to capture notes!");
             return;
         }
 
-        const leadTrack = buildTrackChunk(recordedLeadEvents);
-        const chordEventsFlat = [];
-        recordedChordEvents.forEach(ch => {
-            ch.pitches.forEach(p => chordEventsFlat.push({ pitch: p }));
-        });
-        const chordTrack = buildTrackChunk(chordEventsFlat);
-        const bassTrack = buildTrackChunk(recordedBassEvents);
+        const leadTrack = buildTrackChunk(recordedLeadEvents, totalRecordedSteps, false);
+        const chordTrack = buildTrackChunk(recordedChordEvents, totalRecordedSteps, true);
+        const bassTrack = buildTrackChunk(recordedBassEvents, totalRecordedSteps, false);
 
         // Standard MIDI Header: Type 1 (Multitrack), 3 Tracks, 192 Ticks/Quarter Note
         const headerChunk = new Uint8Array([
-            0x4D, 0x54, 0x68, 0x64, // "MThd"
-            0x00, 0x00, 0x00, 0x06, // Header length
-            0x00, 0x01,             // Format 1
-            0x00, 0x03,             // 3 Tracks
-            0x00, 0xC0              // 192 Ticks per quarter note
+            0x4D, 0x54, 0x68, 0x64,
+            0x00, 0x00, 0x00, 0x06,
+            0x00, 0x01, // Format 1
+            0x00, 0x03, // 3 Tracks
+            0x00, 0xC0  // 192 Ticks/QN
         ]);
 
         const totalLength = headerChunk.length + leadTrack.length + chordTrack.length + bassTrack.length;
@@ -643,7 +697,7 @@
         const blob = new Blob([midiBinary], { type: 'audio/midi' });
         const downloadLink = document.createElement('a');
         downloadLink.href = URL.createObjectURL(blob);
-        downloadLink.download = `Generative_${currentGenre}_Session.mid`;
+        downloadLink.download = `Hooktheory_${currentGenre}_Session.mid`;
         document.body.appendChild(downloadLink);
         downloadLink.click();
         document.body.removeChild(downloadLink);
@@ -661,6 +715,7 @@
         btnRec.addEventListener('click', () => {
             if (!isRecording) {
                 isRecording = true;
+                totalRecordedSteps = 0;
                 recordedLeadEvents = [];
                 recordedChordEvents = [];
                 recordedBassEvents = [];
@@ -685,7 +740,7 @@
                 currentGenre = genre;
                 document.getElementById('genreDisplay').innerText = genre;
 
-                const preset = GENRE_PRESETS[genre];
+                const preset = HOOKTHEORY_PRESETS[genre];
                 if (preset) {
                     document.getElementById('scaleSelect').value = preset.scale;
                     document.getElementById('tempoSlider').value = preset.tempo;

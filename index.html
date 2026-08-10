@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Genre-Driven Dynamic Harmonic & Melody Generator</title>
+    <title>Generative Music Engine & MIDI Studio</title>
     <style>
         :root {
             --bg-color: #121816;
@@ -77,7 +77,7 @@
 
         .header-actions {
             display: grid;
-            grid-template-columns: 2fr 1fr;
+            grid-template-columns: 1fr 1fr;
             gap: 12px;
         }
 
@@ -88,7 +88,7 @@
             padding: 12px;
             font-weight: bold;
             font-size: 13px;
-            letter-spacing: 2px;
+            letter-spacing: 1px;
             border-radius: 6px;
             cursor: pointer;
             display: flex;
@@ -111,12 +111,19 @@
 
         .btn-rec {
             color: var(--accent-rose);
-            border-color: rgba(226, 109, 109, 0.3);
+            border-color: rgba(226, 109, 109, 0.4);
         }
 
         .btn-rec.recording {
             background-color: var(--accent-rose);
             color: #ffffff;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
         }
 
         .rec-dot {
@@ -156,7 +163,7 @@
         .genre-chip.active {
             border-color: var(--accent-purple);
             color: var(--accent-purple);
-            background-color: rgba(155, 114, 207, 0.12);
+            background-color: rgba(155, 114, 207, 0.15);
         }
 
         .control-group {
@@ -270,6 +277,14 @@
             border-radius: 6px;
             margin-top: 8px;
         }
+
+        .rec-status {
+            font-size: 11px;
+            color: var(--accent-rose);
+            font-weight: bold;
+            margin-top: 4px;
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -288,7 +303,11 @@
                 <div class="genre-chip" data-genre="CINEMATIC">CINEMATIC</div>
                 <div class="genre-chip" data-genre="LOFI">LO-FI</div>
                 <div class="genre-chip" data-genre="AMBIENT">AMBIENT</div>
+                <div class="genre-chip" data-genre="SYNTHWAVE">SYNTHWAVE</div>
+                <div class="genre-chip" data-genre="FUNK">FUNK</div>
+                <div class="genre-chip" data-genre="ROCK">ROCK</div>
                 <div class="genre-chip" data-genre="BLUES">BLUES</div>
+                <div class="genre-chip" data-genre="CLASSICAL">CLASSICAL</div>
             </div>
         </div>
 
@@ -296,55 +315,56 @@
             <div class="panel-header">SYNTH VOICE & SOUND DESIGN</div>
             
             <div class="control-group">
-                <div class="control-label"><span>LEAD WAVEFORM</span></div>
+                <div class="control-label"><span>LEAD INSTRUMENT</span></div>
                 <select id="waveSelect">
-                    <option value="triangle" selected>Triangle (Soft Lead / Piano)</option>
-                    <option value="sine">Sine (Pure Warm Tone)</option>
-                    <option value="sawtooth">Sawtooth (Edgy Brass / Synth)</option>
-                    <option value="square">Square (Classic Retro Lead)</option>
+                    <option value="piano" selected>Acoustic Grand Piano</option>
+                    <option value="lead">Warm Poly Synth Lead</option>
+                    <option value="pluck">Soft Plucked Strings</option>
+                    <option value="fm">FM Crystal Bell</option>
                 </select>
             </div>
 
             <div class="control-group">
                 <div class="select-row">
                     <div>
-                        <div class="control-label"><span>CHORD INSTRUMENT</span></div>
+                        <div class="control-label"><span>CHORD TRACK</span></div>
                         <select id="chordSoundSelect">
-                            <option value="piano" selected>Soft Piano</option>
-                            <option value="pad">Warm Poly Pad</option>
-                            <option value="fm">FM Bell Synth</option>
+                            <option value="warm" selected>Warm Analog Pad</option>
+                            <option value="piano">Soft Piano Chords</option>
+                            <option value="epiano">Rhodes E-Piano</option>
                         </select>
                     </div>
                     <div>
-                        <div class="control-label"><span>BASS INSTRUMENT</span></div>
+                        <div class="control-label"><span>BASS TRACK</span></div>
                         <select id="bassSoundSelect">
-                            <option value="sub">Sub Bass</option>
-                            <option value="fm" selected>FM Knock Bass</option>
-                            <option value="upright">Upright Pluck</option>
+                            <option value="sub" selected>Warm Sub Bass</option>
+                            <option value="fm">FM Punch Bass</option>
+                            <option value="upright">Upright Acoustic Bass</option>
                         </select>
                     </div>
                 </div>
             </div>
 
             <div class="toggle-row" style="margin-top: 10px;">
-                <div class="toggle-btn active" id="toggleChords"><div class="indicator"></div> Chords Track</div>
-                <div class="toggle-btn active" id="toggleBass"><div class="indicator"></div> Bass Track</div>
+                <div class="toggle-btn active" id="toggleChords"><div class="indicator"></div> Chords Enable</div>
+                <div class="toggle-btn active" id="toggleBass"><div class="indicator"></div> Bass Enable</div>
             </div>
         </div>
 
         <div class="panel">
             <div class="panel-header">GENRE RULE SPECIFICATIONS</div>
             <div class="info-card" id="genreInfoText">
-                <b>POP ENGINE:</b> Strict 4-chord loop (I-V-vi-IV), quantized beat placement, narrow conjunct melodic motion within 1 octave, and 2-bar motif locking.
+                <b>POP ENGINE:</b> Quantized 4-chord progression (I-V-vi-IV), smooth voice leading, narrow conjunct melodic motion within 1 octave, and 2-bar motif locking.
             </div>
         </div>
     </div>
 
     <div class="column">
         <div class="header-actions">
-            <button class="btn btn-run" id="btnRun">► RUN</button>
-            <button class="btn btn-rec" id="btnRec"><div class="rec-dot"></div> REC MIDI</button>
+            <button class="btn btn-run" id="btnRun">► RUN ENGINE</button>
+            <button class="btn btn-rec" id="btnRec"><div class="rec-dot"></div> ● REC MIDI</button>
         </div>
+        <div class="rec-status" id="recStatus">RECORDING ACTIVE — Click REC MIDI again to save .MID file</div>
 
         <div class="panel">
             <div class="panel-header">MUSIC THEORY & SCALES</div>
@@ -392,7 +412,7 @@
         </div>
 
         <div class="panel">
-            <div class="panel-header">EXPRESSION & HUMANIZATION</div>
+            <div class="panel-header">EXPRESSION & ACOUSTICS</div>
 
             <div class="control-group">
                 <div class="control-label"><span>SWING & MICRO-TIMING DELAY</span><span id="swingVal" class="slider-val">0ms</span></div>
@@ -402,9 +422,16 @@
             </div>
 
             <div class="control-group">
-                <div class="control-label"><span>RHYTHMIC DENSITY / SYNCOPATION</span><span id="densityVal" class="slider-val">65%</span></div>
+                <div class="control-label"><span>REVERB & AMBIENCE SPACE</span><span id="reverbVal" class="slider-val">35%</span></div>
                 <div class="slider-container">
-                    <input type="range" id="densitySlider" min="10" max="100" value="65">
+                    <input type="range" id="reverbSlider" min="0" max="100" value="35">
+                </div>
+            </div>
+
+            <div class="control-group">
+                <div class="control-label"><span>FILTER CUTOFF (WARMTH)</span><span id="filterVal" class="slider-val">3200Hz</span></div>
+                <div class="slider-container">
+                    <input type="range" id="filterSlider" min="400" max="8000" step="100" value="3200">
                 </div>
             </div>
         </div>
@@ -412,29 +439,35 @@
 </div>
 
 <script>
+    // --- AUDIO CONTEXT & BUS ARCHITECTURE ---
     let audioCtx = null;
     let masterGain = null;
+    let masterCompressor = null;
+    let reverbGain = null;
+    let convolverNode = null;
+    let delayNode = null;
+    let delayGain = null;
+
     let isPlaying = false;
     let isRecording = false;
 
-    // Engine Controls
     let currentGenre = 'POP';
     let tempo = 120;
     let playTimer = null;
-    let gridStep = 0; // 16 steps per 2 bars
+    let gridStep = 0; // 16 steps per bar loop
+    let totalRecordedSteps = 0;
+
     let chordsEnabled = true;
     let bassEnabled = true;
-
-    let leadWave = 'triangle';
+    let leadSound = 'piano';
     let chordTonePull = 0.75;
     let swingDelayMs = 0;
-    let rhythmDensity = 0.65;
+    let globalFilterFreq = 3200;
 
-    // Recording Buffers
-    let totalRecordedSteps = 0;
-    let recordedLeadEvents = [];  
-    let recordedChordEvents = []; 
-    let recordedBassEvents = [];  
+    // MIDI Recording Storage
+    let recLeadEvents = [];
+    let recChordEvents = [];
+    let recBassEvents = [];
 
     const SCALES = {
         major: [0, 2, 4, 5, 7, 9, 11],
@@ -445,71 +478,90 @@
         blues: [0, 3, 5, 6, 7, 10]
     };
 
-    // --- EXTENSIVE GENRE CONFIGURATION RULES ---
     const GENRE_RULES = {
         POP: {
-            progression: [0, 4, 5, 3], // I - V - vi - IV
-            scale: 'major', tempo: 120, swing: 0, chordType: 'triad',
-            comping: [1, 0, 0, 0,  1, 0, 0, 0,  1, 0, 0, 0,  1, 0, 0, 0], // Quantized 8th/4th block
+            progression: [0, 4, 5, 3], scale: 'major', tempo: 120, swing: 0, chordType: 'triad',
+            comping: [1, 0, 0, 0,  1, 0, 0, 0,  1, 0, 0, 0,  1, 0, 0, 0],
             bassPattern: [1, 0, 0, 0,  1, 0, 0, 0,  1, 0, 0, 0,  1, 0, 0, 0],
-            melodyRange: 12, conjunctProb: 0.85, motifLock: true,
-            info: "<b>POP ENGINE:</b> Strict 4-chord loop (I-V-vi-IV), quantized beat placement, narrow conjunct melodic motion within 1 octave, and 2-bar motif locking."
+            motifLock: true,
+            info: "<b>POP ENGINE:</b> Quantized 4-chord progression (I-V-vi-IV), smooth voice leading, narrow conjunct melodic motion, and 2-bar motif locking."
         },
         EDM: {
-            progression: [5, 3, 0, 4], // vi - IV - I - V
-            scale: 'minor', tempo: 128, swing: 0, chordType: 'triad',
-            comping: [1, 0, 1, 0,  1, 0, 1, 0,  1, 0, 1, 0,  1, 0, 1, 0], // Driving 8ths
-            bassPattern: [1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1], // 16th driving bass
-            melodyRange: 12, conjunctProb: 0.70, motifLock: true,
-            info: "<b>EDM ENGINE:</b> High-energy driving 16th bass, quantized off-beat chord stabs, and repeating melodic motifs."
+            progression: [5, 3, 0, 4], scale: 'minor', tempo: 128, swing: 0, chordType: 'triad',
+            comping: [1, 0, 1, 0,  1, 0, 1, 0,  1, 0, 1, 0,  1, 0, 1, 0],
+            bassPattern: [1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1],
+            motifLock: true,
+            info: "<b>EDM ENGINE:</b> High-energy driving 16th bass, quantized off-beat chord stabs, and energetic arpeggiated motifs."
         },
         JAZZ: {
-            progression: [1, 4, 0, 5], // ii - V - I - VI (extended 7ths/9ths)
-            scale: 'dorian', tempo: 110, swing: 28, chordType: '7th9th',
-            comping: [0, 1, 0, 0,  1, 0, 0, 1,  0, 1, 0, 0,  1, 0, 1, 0], // Off-beat syncopated stabs
-            bassPattern: [1, 0, 1, 0,  1, 0, 1, 0,  1, 0, 1, 0,  1, 0, 1, 0], // Walking quarter notes
-            melodyRange: 19, conjunctProb: 0.45, motifLock: false,
-            info: "<b>JAZZ ENGINE:</b> Extended harmonies (7ths & 9ths), syncopated comping, walking bass with chromatic target approaches, and heavy behind-the-beat swing."
+            progression: [1, 4, 0, 5], scale: 'dorian', tempo: 110, swing: 28, chordType: '7th9th',
+            comping: [0, 1, 0, 0,  1, 0, 0, 1,  0, 1, 0, 0,  1, 0, 1, 0],
+            bassPattern: [1, 0, 1, 0,  1, 0, 1, 0,  1, 0, 1, 0,  1, 0, 1, 0],
+            motifLock: false,
+            info: "<b>JAZZ ENGINE:</b> Extended harmonies (7ths & 9ths), syncopated off-beat comping, walking basslines, and heavy behind-the-beat swing."
         },
         RNB: {
-            progression: [1, 2, 0, 5], // ii - iii - I - VI
-            scale: 'minor', tempo: 85, swing: 22, chordType: '7th',
-            comping: [1, 0, 0, 1,  0, 1, 0, 0,  1, 0, 0, 1,  0, 0, 1, 0], // Smooth syncopation
+            progression: [1, 2, 0, 5], scale: 'minor', tempo: 88, swing: 20, chordType: '7th',
+            comping: [1, 0, 0, 1,  0, 1, 0, 0,  1, 0, 0, 1,  0, 0, 1, 0],
             bassPattern: [1, 0, 0, 0,  0, 1, 0, 0,  1, 0, 0, 0,  0, 0, 1, 0],
-            melodyRange: 14, conjunctProb: 0.60, motifLock: false,
-            info: "<b>R&B ENGINE:</b> Smooth 7th chords, relaxed micro-timing swing, expressive melodic turns, and syncopated bass grooves."
+            motifLock: false,
+            info: "<b>R&B ENGINE:</b> Lush 7th chords, relaxed micro-timing swing, expressive melodic turns, and groove syncopation."
         },
         CINEMATIC: {
-            progression: [0, 3, 0, 3], // I - iv borrowed modal interchange
-            scale: 'major', tempo: 80, swing: 0, chordType: 'modal',
-            comping: [1, 0, 0, 0,  0, 0, 0, 0,  1, 0, 0, 0,  0, 0, 0, 0], // Arpeggiated pads
-            bassPattern: [1, 0, 0, 0,  0, 0, 0, 0,  1, 0, 0, 0,  0, 0, 0, 0], // Constant pedal bass
-            melodyRange: 24, conjunctProb: 0.25, motifLock: false,
-            info: "<b>CINEMATIC ENGINE:</b> Borrowed modal interchange (minor iv in major key), held bass pedal points, and wide soaring octave melodic leaps."
+            progression: [0, 3, 0, 3], scale: 'major', tempo: 78, swing: 0, chordType: 'modal',
+            comping: [1, 0, 0, 0,  0, 0, 0, 0,  1, 0, 0, 0,  0, 0, 0, 0],
+            bassPattern: [1, 0, 0, 0,  0, 0, 0, 0,  1, 0, 0, 0,  0, 0, 0, 0],
+            motifLock: false,
+            info: "<b>CINEMATIC ENGINE:</b> Borrowed modal interchange (minor iv in major), low bass pedal points, and wide octave melodic leaps."
         },
         LOFI: {
-            progression: [0, 3, 2, 5], // Maj7 & Sus chords
-            scale: 'pentatonic', tempo: 75, swing: 18, chordType: '7th',
-            comping: [1, 0, 0, 0,  0, 0, 1, 0,  0, 0, 1, 0,  0, 0, 0, 0], // Slow relaxed comping
+            progression: [0, 3, 2, 5], scale: 'pentatonic', tempo: 75, swing: 18, chordType: '7th',
+            comping: [1, 0, 0, 0,  0, 0, 1, 0,  0, 0, 1, 0,  0, 0, 0, 0],
             bassPattern: [1, 0, 0, 0,  0, 0, 0, 0,  1, 0, 0, 0,  0, 0, 0, 0],
-            melodyRange: 12, conjunctProb: 0.80, motifLock: false,
+            motifLock: false,
             info: "<b>LO-FI ENGINE:</b> Major 7th chords, pentatonic safety, gentle swing micro-timing, and relaxed non-repetitive melodic wandering."
         },
         AMBIENT: {
-            progression: [0, 5, 3, 4], // Slow chord holds (sus2/sus4)
-            scale: 'pentatonic', tempo: 60, swing: 0, chordType: 'sus',
-            comping: [1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0], // 2-bar long holds
+            progression: [0, 5, 3, 4], scale: 'pentatonic', tempo: 60, swing: 0, chordType: 'sus',
+            comping: [1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0],
             bassPattern: [1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0],
-            melodyRange: 16, conjunctProb: 0.90, motifLock: false,
-            info: "<b>AMBIENT ENGINE:</b> Unresolved suspended chords (sus2/sus4), long multi-bar holds, and generative semi-random pentatonic streams."
+            motifLock: false,
+            info: "<b>AMBIENT ENGINE:</b> Unresolved suspended chords (sus2/sus4), long multi-bar holds, and generative pentatonic streams."
+        },
+        SYNTHWAVE: {
+            progression: [5, 3, 0, 4], scale: 'minor', tempo: 124, swing: 0, chordType: 'triad',
+            comping: [1, 0, 0, 1,  0, 0, 1, 0,  1, 0, 0, 1,  0, 0, 1, 0],
+            bassPattern: [1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1],
+            motifLock: true,
+            info: "<b>SYNTHWAVE ENGINE:</b> 80s analog synth arpeggios, driving octave bass, and filtered sawtooth chords."
+        },
+        FUNK: {
+            progression: [0, 3, 0, 4], scale: 'mixolydian', tempo: 108, swing: 22, chordType: '7th',
+            comping: [0, 1, 1, 0,  1, 0, 1, 1,  0, 1, 1, 0,  1, 0, 1, 0],
+            bassPattern: [1, 0, 0, 1,  0, 1, 0, 0,  1, 0, 0, 1,  0, 1, 0, 0],
+            motifLock: false,
+            info: "<b>FUNK ENGINE:</b> Highly syncopated 16th-note chord stabs, dominant 7th voicings, and slap bass rhythms."
+        },
+        ROCK: {
+            progression: [0, 3, 4, 3], scale: 'major', tempo: 130, swing: 0, chordType: 'triad',
+            comping: [1, 0, 1, 0,  1, 0, 1, 0,  1, 0, 1, 0,  1, 0, 1, 0],
+            bassPattern: [1, 0, 1, 0,  1, 0, 1, 0,  1, 0, 1, 0,  1, 0, 1, 0],
+            motifLock: false,
+            info: "<b>ROCK ENGINE:</b> Power eighth-note driving rhythm, energetic pentatonic lead riffs, and direct downbeat bass."
         },
         BLUES: {
-            progression: [0, 3, 0, 4], // I7 - IV7 - I7 - V7
-            scale: 'blues', tempo: 95, swing: 32, chordType: '7th',
-            comping: [1, 0, 1, 0,  1, 0, 1, 0,  1, 0, 1, 0,  1, 0, 1, 0], // Shuffle
+            progression: [0, 3, 0, 4], scale: 'blues', tempo: 96, swing: 30, chordType: '7th',
+            comping: [1, 0, 1, 0,  1, 0, 1, 0,  1, 0, 1, 0,  1, 0, 1, 0],
             bassPattern: [1, 0, 1, 0,  1, 0, 1, 0,  1, 0, 1, 0,  1, 0, 1, 0],
-            melodyRange: 16, conjunctProb: 0.50, motifLock: false,
+            motifLock: false,
             info: "<b>BLUES ENGINE:</b> Dominant 7th shuffle, blues scale inflection, heavy swing timing, and call-and-response riffs."
+        },
+        CLASSICAL: {
+            progression: [0, 3, 4, 0], scale: 'major', tempo: 100, swing: 0, chordType: 'triad',
+            comping: [1, 0, 1, 0,  1, 0, 1, 0,  1, 0, 1, 0,  1, 0, 1, 0],
+            bassPattern: [1, 0, 0, 0,  1, 0, 0, 0,  1, 0, 0, 0,  1, 0, 0, 0],
+            motifLock: true,
+            info: "<b>CLASSICAL ENGINE:</b> Alberti broken-chord accompaniment, stepwise vocal melodies, and strict functional dynamics."
         }
     };
 
@@ -518,48 +570,129 @@
 
     function mtof(midi) { return 440 * Math.pow(2, (midi - 69) / 12); }
 
+    // --- IMPULSE RESPONSE GENERATOR FOR REVERB ---
+    function createReverbImpulse(context, duration = 1.8, decay = 2.0) {
+        const rate = context.sampleRate;
+        const length = rate * duration;
+        const impulse = context.createBuffer(2, length, rate);
+        const left = impulse.getChannelData(0);
+        const right = impulse.getChannelData(1);
+
+        for (let i = 0; i < length; i++) {
+            const n = i / length;
+            const envelope = Math.pow(1 - n, decay);
+            left[i] = (Math.random() * 2 - 1) * envelope;
+            right[i] = (Math.random() * 2 - 1) * envelope;
+        }
+        return impulse;
+    }
+
     function initAudio() {
         if (!audioCtx) {
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+            // Master Bus Setup
+            masterCompressor = audioCtx.createDynamicsCompressor();
+            masterCompressor.threshold.setValueAtTime(-12, audioCtx.currentTime);
+            masterCompressor.knee.setValueAtTime(10, audioCtx.currentTime);
+            masterCompressor.ratio.setValueAtTime(4, audioCtx.currentTime);
+            masterCompressor.attack.setValueAtTime(0.005, audioCtx.currentTime);
+            masterCompressor.release.setValueAtTime(0.1, audioCtx.currentTime);
+
             masterGain = audioCtx.createGain();
-            masterGain.gain.setValueAtTime(0.8, audioCtx.currentTime);
-            masterGain.connect(audioCtx.destination);
+            masterGain.gain.setValueAtTime(0.75, audioCtx.currentTime);
+
+            // Reverb Effect Bus
+            convolverNode = audioCtx.createConvolver();
+            convolverNode.buffer = createReverbImpulse(audioCtx);
+            reverbGain = audioCtx.createGain();
+            reverbGain.gain.setValueAtTime(0.35, audioCtx.currentTime);
+
+            // Delay Effect Bus
+            delayNode = audioCtx.createDelay();
+            delayNode.delayTime.setValueAtTime(0.25, audioCtx.currentTime); // 8th note at 120bpm
+            delayGain = audioCtx.createGain();
+            delayGain.gain.setValueAtTime(0.20, audioCtx.currentTime);
+
+            // Routing
+            convolverNode.connect(reverbGain);
+            reverbGain.connect(masterGain);
+
+            delayNode.connect(delayGain);
+            delayGain.connect(masterGain);
+            delayGain.connect(delayNode); // Feedback loop
+
+            masterGain.connect(masterCompressor);
+            masterCompressor.connect(audioCtx.destination);
         }
     }
 
-    function playTone(freq, type, duration, vol, delayMs = 0, attack = 0.02) {
+    // --- HIGH QUALITY FILTERED ADSR SYNTH VOICE ---
+    function playPolishedTone(freq, type, duration, vol, delayMs = 0, attack = 0.02, decay = 0.15, sustain = 0.6, release = 0.25, cutoff = 3200) {
         if (!audioCtx) return;
+
         setTimeout(() => {
+            const now = audioCtx.currentTime;
+
             const osc = audioCtx.createOscillator();
+            const filter = audioCtx.createBiquadFilter();
             const gain = audioCtx.createGain();
 
             osc.type = type;
-            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            osc.frequency.setValueAtTime(freq, now);
 
-            const now = audioCtx.currentTime;
+            // Filter Envelope
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(cutoff, now);
+            filter.frequency.exponentialRampToValueAtTime(Math.max(100, cutoff * 0.3), now + duration);
+
+            // Gain ADSR Envelope
             gain.gain.setValueAtTime(0, now);
             gain.gain.linearRampToValueAtTime(vol, now + attack);
-            gain.gain.exponentialRampToValueAtTime(0.0001, now + attack + duration);
+            gain.gain.exponentialRampToValueAtTime(vol * sustain, now + attack + decay);
+            gain.gain.setValueAtTime(vol * sustain, now + duration);
+            gain.gain.exponentialRampToValueAtTime(0.0001, now + duration + release);
 
-            osc.connect(gain);
+            osc.connect(filter);
+            filter.connect(gain);
+
+            // Audio Send Routing
             gain.connect(masterGain);
+            gain.connect(convolverNode);
+            gain.connect(delayNode);
 
             osc.start(now);
-            osc.stop(now + attack + duration + 0.1);
+            osc.stop(now + duration + release + 0.1);
         }, delayMs);
+    }
+
+    function playLeadVoice(midiPitch, instrument, duration, vol, delayMs = 0) {
+        const freq = mtof(midiPitch);
+        if (instrument === 'piano') {
+            playPolishedTone(freq, 'triangle', duration, vol * 1.1, delayMs, 0.008, 0.12, 0.4, 0.3, globalFilterFreq);
+            playPolishedTone(freq * 0.5, 'sine', duration, vol * 0.3, delayMs, 0.008, 0.15, 0.2, 0.3, globalFilterFreq * 0.5);
+        } else if (instrument === 'lead') {
+            playPolishedTone(freq, 'sawtooth', duration, vol * 0.7, delayMs, 0.02, 0.1, 0.7, 0.2, globalFilterFreq);
+            playPolishedTone(freq * 1.005, 'sawtooth', duration, vol * 0.5, delayMs, 0.02, 0.1, 0.7, 0.2, globalFilterFreq);
+        } else if (instrument === 'pluck') {
+            playPolishedTone(freq, 'sine', duration * 0.5, vol * 1.2, delayMs, 0.003, 0.08, 0.1, 0.1, globalFilterFreq * 1.2);
+        } else { // FM Bell
+            playPolishedTone(freq, 'sine', duration, vol * 0.9, delayMs, 0.005, 0.2, 0.3, 0.4, globalFilterFreq);
+            playPolishedTone(freq * 2.01, 'sine', duration * 0.6, vol * 0.4, delayMs, 0.005, 0.1, 0.1, 0.2, globalFilterFreq * 1.5);
+        }
     }
 
     function playChordVoice(midiPitches, soundType, duration, vol) {
         midiPitches.forEach((pitch, i) => {
             const freq = mtof(pitch);
-            if (soundType === 'pad') {
-                playTone(freq, 'sawtooth', duration, vol * 0.4, 0, 0.1);
-                playTone(freq, 'triangle', duration, vol * 0.5, 0, 0.1);
-            } else if (soundType === 'fm') {
-                playTone(freq, 'sine', duration, vol * 0.6, 0, 0.02);
-                playTone(freq * 2, 'sine', duration * 0.5, vol * 0.2, 0, 0.01);
-            } else { // Piano
-                playTone(freq, 'triangle', duration, vol * 0.8, i * 10, 0.01);
+            if (soundType === 'warm') {
+                playPolishedTone(freq, 'sawtooth', duration, vol * 0.3, i * 12, 0.06, 0.2, 0.8, 0.4, globalFilterFreq * 0.7);
+                playPolishedTone(freq * 0.997, 'triangle', duration, vol * 0.4, i * 12, 0.06, 0.2, 0.8, 0.4, globalFilterFreq * 0.7);
+            } else if (soundType === 'epiano') {
+                playPolishedTone(freq, 'sine', duration, vol * 0.8, i * 10, 0.01, 0.15, 0.4, 0.3, globalFilterFreq);
+                playPolishedTone(freq * 3, 'sine', duration * 0.3, vol * 0.2, i * 10, 0.005, 0.05, 0.1, 0.1, globalFilterFreq);
+            } else { // Soft Piano
+                playPolishedTone(freq, 'triangle', duration, vol * 0.7, i * 8, 0.01, 0.1, 0.3, 0.25, globalFilterFreq * 0.8);
             }
         });
     }
@@ -567,15 +700,17 @@
     function playBassVoice(midiPitch, soundType, duration, vol) {
         const freq = mtof(midiPitch);
         if (soundType === 'sub') {
-            playTone(freq, 'sine', duration, vol * 1.3, 0, 0.02);
+            playPolishedTone(freq, 'sine', duration, vol * 1.4, 0, 0.015, 0.1, 0.8, 0.2, 600);
+            playPolishedTone(freq * 2, 'triangle', duration * 0.7, vol * 0.3, 0, 0.015, 0.1, 0.4, 0.15, 800);
         } else if (soundType === 'upright') {
-            playTone(freq, 'triangle', duration, vol * 0.9, 0, 0.005);
+            playPolishedTone(freq, 'triangle', duration, vol * 1.0, 0, 0.008, 0.12, 0.3, 0.2, 1200);
         } else { // FM Knock
-            playTone(freq, 'square', duration * 0.6, vol * 0.7, 0, 0.01);
+            playPolishedTone(freq, 'square', duration * 0.7, vol * 0.8, 0, 0.005, 0.08, 0.3, 0.15, 1800);
+            playPolishedTone(freq * 0.5, 'sine', duration, vol * 0.6, 0, 0.01, 0.1, 0.6, 0.2, 400);
         }
     }
 
-    // Smooth voice leading algorithm
+    // --- VOICE LEADING ---
     function voiceLead(rawPitches, prevPitches) {
         if (!prevPitches || prevPitches.length === 0) return rawPitches;
         return rawPitches.map((pitch, idx) => {
@@ -594,10 +729,10 @@
         }).sort((a, b) => a - b);
     }
 
-    // --- STEP GENERATION LOOP ---
+    // --- GENERATIVE STEP LOOP ---
     function tick() {
         const rule = GENRE_RULES[currentGenre] || GENRE_RULES.POP;
-        const rootKey = parseInt(document.getElementById('rootSelect').value) + 48; // C3
+        const rootKey = parseInt(document.getElementById('rootSelect').value) + 48; // C3 Base
         const scaleType = document.getElementById('scaleSelect').value;
         const intervals = SCALES[scaleType] || SCALES.major;
 
@@ -614,17 +749,17 @@
         const chordRootMidi = rootKey + intervals[chordDegree % intervals.length];
         const nextChordRootMidi = rootKey + intervals[nextChordDegree % intervals.length];
 
-        // --- 1. HARMONY GENERATION ---
+        // 1. Chords
         let rawChordNotes = [];
         if (rule.chordType === '7th9th') {
             rawChordNotes = [chordRootMidi, chordRootMidi + 4, chordRootMidi + 7, chordRootMidi + 11, chordRootMidi + 14];
         } else if (rule.chordType === '7th') {
             rawChordNotes = [chordRootMidi, chordRootMidi + 4, chordRootMidi + 7, chordRootMidi + 10];
         } else if (rule.chordType === 'sus') {
-            rawChordNotes = [chordRootMidi, chordRootMidi + 2, chordRootMidi + 7]; // Sus2
-        } else if (rule.chordType === 'modal' && barIdx === 3) { // Borrowed minor iv
+            rawChordNotes = [chordRootMidi, chordRootMidi + 2, chordRootMidi + 7];
+        } else if (rule.chordType === 'modal' && barIdx === 3) {
             const ivRoot = rootKey + intervals[3];
-            rawChordNotes = [ivRoot, ivRoot + 3, ivRoot + 7]; // Minor triad
+            rawChordNotes = [ivRoot, ivRoot + 3, ivRoot + 7]; // Minor iv
         } else {
             rawChordNotes = [chordRootMidi, chordRootMidi + 4, chordRootMidi + 7];
         }
@@ -632,47 +767,41 @@
         const voicedChord = voiceLead(rawChordNotes, prevChordPitches);
         prevChordPitches = voicedChord;
 
-        // Apply Swing Micro-Timing
         const isOffBeat = stepInBar % 2 !== 0;
         const actualDelay = isOffBeat ? swingDelayMs : 0;
 
         if (chordsEnabled && rule.comping[stepInBar] === 1) {
-            playChordVoice(voicedChord, chordSound, 0.5, 0.08);
-            if (isRecording) recordedChordEvents.push({ stepIndex: totalRecordedSteps, pitches: voicedChord, durationInSteps: 2 });
+            playChordVoice(voicedChord, chordSound, 0.45, 0.08);
+            if (isRecording) recChordEvents.push({ step: totalRecordedSteps, pitches: voicedChord, duration: 2 });
         }
 
-        // --- 2. BASSLINE GENERATION ---
+        // 2. Bass
         if (bassEnabled && rule.bassPattern[stepInBar] === 1) {
             let bassMidi = chordRootMidi - 12;
-
-            // Walking Bass Target Approach (Jazz/Blues)
             if ((currentGenre === 'JAZZ' || currentGenre === 'BLUES') && stepInBar % 4 === 3) {
-                bassMidi = (nextChordRootMidi - 12) - 1; // Chromatic step down
+                bassMidi = (nextChordRootMidi - 12) - 1; // Chromatic target approach
             } else if (currentGenre === 'CINEMATIC') {
-                bassMidi = rootKey - 12; // Held pedal point
+                bassMidi = rootKey - 12;
             }
 
-            playBassVoice(bassMidi, bassSound, 0.4, 0.18);
-            if (isRecording) recordedBassEvents.push({ stepIndex: totalRecordedSteps, pitch: bassMidi, durationInSteps: 2 });
+            playBassVoice(bassMidi, bassSound, 0.35, 0.18);
+            if (isRecording) recBassEvents.push({ step: totalRecordedSteps, pitch: bassMidi, duration: 2 });
         }
 
-        // --- 3. MELODY GENERATION (Motifs & Scale Constraints) ---
+        // 3. Melody
         if (stepInBar % 2 === 0) {
             let melodyMidi = chordRootMidi + 12;
 
             if (rule.motifLock) {
                 if (gridStep < 8) {
-                    // Generate new motif phrase
                     let idx = Math.floor(Math.random() * intervals.length);
                     melodyMidi = rootKey + 12 + intervals[idx];
                     storedMotifMelody[stepInBar] = melodyMidi;
                 } else {
-                    // Repeat stored motif phrase (change last note to chord degree)
                     melodyMidi = storedMotifMelody[stepInBar % 8] || (rootKey + 12);
                     if (stepInBar === 6) melodyMidi = chordRootMidi + 12;
                 }
             } else {
-                // Generative wandering
                 let scaleIdx = Math.floor(Math.random() * intervals.length);
                 if (Math.random() < chordTonePull) {
                     const chordPitchesUpper = voicedChord.map(p => p + 12);
@@ -682,40 +811,173 @@
                 }
             }
 
-            playTone(mtof(melodyMidi), leadWave, 0.22, 0.15, actualDelay);
-            if (isRecording) recordedLeadEvents.push({ stepIndex: totalRecordedSteps, pitch: melodyMidi, durationInSteps: 2 });
+            playLeadVoice(melodyMidi, leadSound, 0.22, 0.15, actualDelay);
+            if (isRecording) recLeadEvents.push({ step: totalRecordedSteps, pitch: melodyMidi, duration: 2 });
         }
 
         gridStep = (gridStep + 1) % 16;
         if (isRecording) totalRecordedSteps++;
     }
 
+    // --- STANDALONE VANILLA JS PURE BINARY MIDI EXPORTER ---
+    function generateAndDownloadMidi() {
+        const ticksPerQuarter = 96;
+        const ticksPerStep = ticksPerQuarter / 2; // 16th step = 48 ticks
+
+        function encodeVLQ(num) {
+            let buf = [];
+            let val = num & 0x7f;
+            while (num >> 7) {
+                num >>= 7;
+                val <<= 8;
+                val |= (num & 0x7f) | 0x80;
+            }
+            while (true) {
+                buf.push(val & 0xff);
+                if (val & 0x80) val >>= 8;
+                else break;
+            }
+            return buf;
+        }
+
+        function buildTrackChunk(events) {
+            let trackBytes = [];
+            
+            // Set Tempo Meta Event (500000 microseconds per quarter note default)
+            const tempoMicro = Math.round(60000000 / tempo);
+            trackBytes.push(0x00, 0xFF, 0x51, 0x03, (tempoMicro >> 16) & 0xFF, (tempoMicro >> 8) & 0xFF, tempoMicro & 0xFF);
+
+            let lastTick = 0;
+            events.sort((a, b) => a.tick - b.tick);
+
+            events.forEach(e => {
+                let delta = e.tick - lastTick;
+                if (delta < 0) delta = 0;
+                lastTick = e.tick;
+
+                let vlq = encodeVLQ(delta);
+                trackBytes.push(...vlq);
+
+                if (e.type === 'on') {
+                    trackBytes.push(0x90 | e.channel, e.pitch, e.velocity);
+                } else {
+                    trackBytes.push(0x80 | e.channel, e.pitch, 0x00);
+                }
+            });
+
+            // End of Track
+            trackBytes.push(0x00, 0xFF, 0x2F, 0x00);
+
+            // MTrk header
+            let len = trackBytes.length;
+            let header = [0x4D, 0x54, 0x72, 0x6B, (len >> 24) & 0xFF, (len >> 16) & 0xFF, (len >> 8) & 0xFF, len & 0xFF];
+            return header.concat(trackBytes);
+        }
+
+        let midiEvents = [];
+
+        // Convert Lead Events (Channel 0)
+        recLeadEvents.forEach(e => {
+            let startTick = e.step * ticksPerStep;
+            let endTick = startTick + (e.duration * ticksPerStep);
+            midiEvents.push({ tick: startTick, type: 'on', channel: 0, pitch: e.pitch, velocity: 90 });
+            midiEvents.push({ tick: endTick, type: 'off', channel: 0, pitch: e.pitch, velocity: 0 });
+        });
+
+        // Convert Chord Events (Channel 1)
+        recChordEvents.forEach(e => {
+            let startTick = e.step * ticksPerStep;
+            let endTick = startTick + (e.duration * ticksPerStep);
+            e.pitches.forEach(p => {
+                midiEvents.push({ tick: startTick, type: 'on', channel: 1, pitch: p, velocity: 75 });
+                midiEvents.push({ tick: endTick, type: 'off', channel: 1, pitch: p, velocity: 0 });
+            });
+        });
+
+        // Convert Bass Events (Channel 2)
+        recBassEvents.forEach(e => {
+            let startTick = e.step * ticksPerStep;
+            let endTick = startTick + (e.duration * ticksPerStep);
+            midiEvents.push({ tick: startTick, type: 'on', channel: 2, pitch: e.pitch, velocity: 100 });
+            midiEvents.push({ tick: endTick, type: 'off', channel: 2, pitch: e.pitch, velocity: 0 });
+        });
+
+        let trackChunk = buildTrackChunk(midiEvents);
+
+        // Header Chunk: MThd, len=6, format=0 (single track), tracks=1, division=96
+        let headerChunk = [
+            0x4D, 0x54, 0x68, 0x64, // MThd
+            0x00, 0x00, 0x00, 0x06, // Length 6
+            0x00, 0x00,             // Format 0
+            0x00, 0x01,             // 1 track
+            0x00, 0x60              // 96 TPQN
+        ];
+
+        let fullMidiFile = new Uint8Array(headerChunk.concat(trackChunk));
+        let blob = new Blob([fullMidiFile], { type: 'audio/midi' });
+        let url = URL.createObjectURL(blob);
+
+        let a = document.createElement('a');
+        a.href = url;
+        a.download = `generative_${currentGenre.toLowerCase()}_composition.mid`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
     function startEngine() {
         initAudio();
         if (audioCtx.state === 'suspended') audioCtx.resume();
         isPlaying = true;
-        document.getElementById('btnRun').innerText = '■ STOP';
+        document.getElementById('btnRun').innerText = '■ STOP ENGINE';
         document.getElementById('btnRun').classList.add('active');
 
-        const intervalMs = (60 / tempo) * 1000 / 2; // 8th note grid
+        const intervalMs = (60 / tempo) * 1000 / 2; // 8th note resolution
         playTimer = setInterval(tick, intervalMs);
     }
 
     function stopEngine() {
         isPlaying = false;
         if (playTimer) clearInterval(playTimer);
-        document.getElementById('btnRun').innerText = '► RUN';
+        document.getElementById('btnRun').innerText = '► RUN ENGINE';
         document.getElementById('btnRun').classList.remove('active');
     }
 
-    // --- DOM CONTROLS ---
+    // --- DOM EVENT HANDLERS ---
     window.addEventListener('DOMContentLoaded', () => {
         document.getElementById('btnRun').addEventListener('click', () => {
             if (isPlaying) stopEngine();
             else startEngine();
         });
 
-        // Genre Selector Buttons
+        document.getElementById('btnRec').addEventListener('click', function() {
+            if (!isRecording) {
+                isRecording = true;
+                totalRecordedSteps = 0;
+                recLeadEvents = [];
+                recChordEvents = [];
+                recBassEvents = [];
+                this.classList.add('recording');
+                this.innerHTML = '<div class="rec-dot"></div> ■ SAVE .MID';
+                document.getElementById('recStatus').style.display = 'block';
+
+                if (!isPlaying) startEngine();
+            } else {
+                isRecording = false;
+                this.classList.remove('recording');
+                this.innerHTML = '<div class="rec-dot"></div> ● REC MIDI';
+                document.getElementById('recStatus').style.display = 'none';
+
+                if (recLeadEvents.length > 0 || recChordEvents.length > 0 || recBassEvents.length > 0) {
+                    generateAndDownloadMidi();
+                } else {
+                    alert('No MIDI notes recorded yet. Play a few bars first!');
+                }
+            }
+        });
+
+        // Genre Selector Chips
         document.querySelectorAll('#genreButtons .genre-chip').forEach(btn => {
             btn.addEventListener('click', () => {
                 document.querySelectorAll('#genreButtons .genre-chip').forEach(b => b.classList.remove('active'));
@@ -753,14 +1015,20 @@
             document.getElementById('swingVal').innerText = `${swingDelayMs}ms`;
         });
 
+        document.getElementById('reverbSlider').addEventListener('input', (e) => {
+            const val = parseInt(e.target.value) / 100;
+            document.getElementById('reverbVal').innerText = `${e.target.value}%`;
+            if (reverbGain) reverbGain.gain.setValueAtTime(val * 0.8, audioCtx.currentTime);
+        });
+
+        document.getElementById('filterSlider').addEventListener('input', (e) => {
+            globalFilterFreq = parseInt(e.target.value);
+            document.getElementById('filterVal').innerText = `${globalFilterFreq}Hz`;
+        });
+
         document.getElementById('pullSlider').addEventListener('input', (e) => {
             chordTonePull = parseFloat(e.target.value);
             document.getElementById('pullVal').innerText = chordTonePull.toFixed(2);
-        });
-
-        document.getElementById('densitySlider').addEventListener('input', (e) => {
-            rhythmDensity = parseInt(e.target.value) / 100;
-            document.getElementById('densityVal').innerText = `${e.target.value}%`;
         });
 
         document.getElementById('toggleChords').addEventListener('click', function() {
@@ -774,7 +1042,7 @@
         });
 
         document.getElementById('waveSelect').addEventListener('change', (e) => {
-            leadWave = e.target.value;
+            leadSound = e.target.value;
         });
     });
 </script>

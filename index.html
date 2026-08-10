@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Markov Generative Music Engine & Sound Design</title>
+    <title>Advanced Harmonic & Melodic Motion Engine</title>
     <style>
         :root {
             --bg-color: #f4f6f8;
@@ -372,23 +372,22 @@
         </div>
 
         <div class="panel">
-            <div class="panel-header">MARKOV ENGINE & CHAOS DYNAMICS</div>
+            <div class="panel-header">VOICE LEADING & MOTION CONTROLS</div>
             <div class="control-group">
-                <div class="control-label"><span>CHAOS / MARKOV DENSITY FACTOR</span></div>
+                <div class="control-label"><span>LEAP RESOLUTION SENSITIVITY</span></div>
                 <div class="slider-container">
                     <input type="range" id="rhoSlider" min="10" max="50" step="0.1" value="28.0">
                     <span class="slider-val" id="rhoVal">28.0</span>
                 </div>
             </div>
             <div class="description-text">
-                Engine utilizes a <b>2nd-Order Markov Chain</b> for pitch intervals coupled with a <b>Decoupled Rhythm Chain</b> and constraint filtering for melodic voice-leading.
+                Features <b>Voice-Led Chord Inversions</b>, <b>Sus4 $\rightarrow$ 3 Resolutions</b>, <b>Leap-Resolution Motion</b>, and <b>Syncopated Comping Rhythms</b>.
             </div>
         </div>
     </div>
 </div>
 
 <script>
-    // --- WEBAUDIO & GENERATIVE MARKOV ENGINE ---
     let audioCtx = null;
     let masterFilter = null;
     let isPlaying = false;
@@ -397,7 +396,7 @@
     let currentGenre = 'POP';
     let tempo = 120;
     let playTimer = null;
-    let currentGridStep = 0;
+    let currentGridStep = 0; // 16 steps per bar (16th notes)
     
     let chordsEnabled = true;
     let bassEnabled = true;
@@ -410,9 +409,9 @@
 
     // Recording Buffers
     let totalRecordedSteps = 0;
-    let recordedLeadEvents = [];  // { stepIndex, pitch, durationInSteps }
-    let recordedChordEvents = []; // { stepIndex, pitches, durationInSteps }
-    let recordedBassEvents = [];  // { stepIndex, pitch, durationInSteps }
+    let recordedLeadEvents = [];  
+    let recordedChordEvents = []; 
+    let recordedBassEvents = [];  
 
     const SCALES = {
         major: [0, 2, 4, 5, 7, 9, 11],
@@ -435,18 +434,15 @@
         EDM: { progression: [6, 4, 1, 5], scale: 'minor', tempo: 128, rho: 40.0, wave: 'sawtooth', chordType: 'triad' }
     };
 
-    // --- 2ND ORDER MARKOV MATRIX FOR MELODIC INTERVAL STEPPING ---
-    // Transition probabilities based on interval movement history [prev_step_delta, current_step_delta]
+    // 2nd-Order Markov Chains
     const MARKOV_2ND_ORDER_LEAD = {
-        'up-up':     [ { delta: 1, prob: 0.5 }, { delta: 2, prob: 0.2 }, { delta: -1, prob: 0.3 } ],
-        'up-down':   [ { delta: 1, prob: 0.4 }, { delta: -1, prob: 0.4 }, { delta: 0, prob: 0.2 } ],
-        'down-down': [ { delta: -1, prob: 0.5 }, { delta: -2, prob: 0.2 }, { delta: 1, prob: 0.3 } ],
-        'down-up':   [ { delta: 1, prob: 0.4 }, { delta: -1, prob: 0.4 }, { delta: 0, prob: 0.2 } ],
+        'up-up':     [ { delta: 1, prob: 0.5 }, { delta: 2, prob: 0.1 }, { delta: -1, prob: 0.4 } ],
+        'up-down':   [ { delta: 1, prob: 0.35 }, { delta: -1, prob: 0.45 }, { delta: 0, prob: 0.2 } ],
+        'down-down': [ { delta: -1, prob: 0.5 }, { delta: -2, prob: 0.1 }, { delta: 1, prob: 0.4 } ],
+        'down-up':   [ { delta: 1, prob: 0.45 }, { delta: -1, prob: 0.35 }, { delta: 0, prob: 0.2 } ],
         'same-same': [ { delta: 1, prob: 0.4 }, { delta: -1, prob: 0.4 }, { delta: 0, prob: 0.2 } ]
     };
 
-    // --- DECOUPLED RHYTHM MARKOV MATRIX ---
-    // Maps current duration state to next note step duration (in 8th-note steps: 1 = 8th, 2 = 1/4, 4 = 1/2)
     const MARKOV_RHYTHM_CHAIN = {
         1: [ { dur: 1, prob: 0.5 }, { dur: 2, prob: 0.4 }, { dur: 4, prob: 0.1 } ],
         2: [ { dur: 1, prob: 0.4 }, { dur: 2, prob: 0.4 }, { dur: 4, prob: 0.2 } ],
@@ -456,6 +452,9 @@
     let markovLeadDirectionHistory = ['up', 'up'];
     let markovCurrentRhythmDur = 1;
     let leadRemainingHoldSteps = 0;
+    let previousChordPitches = null;
+    let isLeapPendingResolution = false;
+    let leapDirection = 0; // +1 for up-leap, -1 for down-leap
 
     function mtof(midi) {
         return 440 * Math.pow(2, (midi - 69) / 12);
@@ -492,7 +491,6 @@
         osc.stop(now + parseFloat(attackTime) + duration + parseFloat(releaseTime));
     }
 
-    // Weighted Markov Roll Helper
     function rollMarkov(transitions) {
         const rand = Math.random();
         let cumulative = 0;
@@ -503,7 +501,29 @@
         return transitions[0];
     }
 
-    let lastMelodyNoteIdx = 2; // Default scale index
+    // --- VOICE LEADING INVERSION ENGINE ---
+    function voiceLeadChord(rawPitches, prevPitches) {
+        if (!prevPitches || prevPitches.length === 0) return rawPitches;
+
+        return rawPitches.map((pitch, idx) => {
+            const target = prevPitches[idx] || prevPitches[0];
+            let bestPitch = pitch;
+            let minDistance = Math.abs(pitch - target);
+
+            // Check octave shifts (-24 to +24) to find closest pitch distance
+            for (let shift = -24; shift <= 24; shift += 12) {
+                const candidate = pitch + shift;
+                const dist = Math.abs(candidate - target);
+                if (dist < minDistance) {
+                    minDistance = dist;
+                    bestPitch = candidate;
+                }
+            }
+            return bestPitch;
+        }).sort((a, b) => a - b);
+    }
+
+    let lastMelodyNoteIdx = 2;
 
     function generateAndPlayStep() {
         const rootKey = parseInt(document.getElementById('rootSelect').value) + 48;
@@ -511,31 +531,43 @@
         const intervals = SCALES[scaleType] || SCALES.major;
         const preset = GENRE_PRESETS[currentGenre];
 
-        // --- 1. HARMONY & CHORDS (Bar Boundaries) ---
+        // --- 1. HARMONY & CHORDS (Syncopated Comping & Inversions) ---
         const barIndex = Math.floor(currentGridStep / 4) % preset.progression.length;
-        const chordDegree = preset.progression[barIndex] - 1; // 0-based scale degree
+        const chordDegree = preset.progression[barIndex] - 1;
         const chordRootMidi = rootKey + intervals[chordDegree % intervals.length];
         
-        let chordNotes = [];
+        let rawChordNotes = [];
         if (preset.chordType === '7th9th') {
-            chordNotes = [chordRootMidi, chordRootMidi + 4, chordRootMidi + 7, chordRootMidi + 11, chordRootMidi + 14];
+            rawChordNotes = [chordRootMidi, chordRootMidi + 4, chordRootMidi + 7, chordRootMidi + 11, chordRootMidi + 14];
         } else if (preset.chordType === '7th') {
-            chordNotes = [chordRootMidi, chordRootMidi + 4, chordRootMidi + 7, chordRootMidi + 10];
+            rawChordNotes = [chordRootMidi, chordRootMidi + 4, chordRootMidi + 7, chordRootMidi + 10];
         } else if (preset.chordType === 'power') {
-            chordNotes = [chordRootMidi, chordRootMidi + 7, chordRootMidi + 12];
+            rawChordNotes = [chordRootMidi, chordRootMidi + 7, chordRootMidi + 12];
         } else {
-            chordNotes = [chordRootMidi, chordRootMidi + 4, chordRootMidi + 7];
+            rawChordNotes = [chordRootMidi, chordRootMidi + 4, chordRootMidi + 7];
         }
 
-        if (currentGridStep % 4 === 0) {
+        // Apply Suspension (Sus4 -> 3) on Beat 1
+        if (currentGridStep % 4 === 0 && Math.random() < 0.35 && rawChordNotes.length >= 2) {
+            rawChordNotes[1] += 1; // Elevate 3rd to 4th (sus4)
+        }
+
+        const voicedChord = voiceLeadChord(rawChordNotes, previousChordPitches);
+
+        // Syncopated Syncing: Play onBeat 1, beat 2.5 ("and" of 2), and beat 4
+        const isCompingStep = (currentGridStep % 4 === 0) || (currentGridStep % 4 === 2 && Math.random() < 0.5);
+
+        if (isCompingStep) {
+            previousChordPitches = voicedChord;
+
             if (chordsEnabled) {
-                chordNotes.forEach(midi => playSynthTone(mtof(midi), 'sine', 1.2, 0.06));
+                voicedChord.forEach(midi => playSynthTone(mtof(midi), 'sine', 0.8, 0.06));
                 if (isRecording) {
-                    recordedChordEvents.push({ stepIndex: totalRecordedSteps, pitches: chordNotes, durationInSteps: 4 });
+                    recordedChordEvents.push({ stepIndex: totalRecordedSteps, pitches: voicedChord, durationInSteps: 2 });
                 }
             }
 
-            if (bassEnabled) {
+            if (bassEnabled && currentGridStep % 4 === 0) {
                 const bassMidi = chordRootMidi - 12;
                 playSynthTone(mtof(bassMidi), 'sawtooth', 0.8, 0.14);
                 if (isRecording) {
@@ -544,32 +576,42 @@
             }
         }
 
-        // --- 2. 2ND-ORDER MARKOV LEAD WITH DECOUPLED RHYTHM & CONSTRAINT FILTERING ---
+        // --- 2. MELODIC MOVEMENT (The Golden Rule Leap Resolution) ---
         if (leadRemainingHoldSteps <= 0) {
-            // Determine Markov 2nd-order State Key
-            const markovStateKey = `${markovLeadDirectionHistory[0]}-${markovLeadDirectionHistory[1]}`;
-            const pitchTransitions = MARKOV_2ND_ORDER_LEAD[markovStateKey] || MARKOV_2ND_ORDER_LEAD['up-down'];
-            
-            let chosenDelta = rollMarkov(pitchTransitions).delta;
+            let chosenDelta = 0;
 
-            // Constraint Filter: Force downbeats (beat 1 & 3) to align with strong chord degrees
-            let candidateIdx = (lastMelodyNoteIdx + chosenDelta + intervals.length * 2) % intervals.length;
-            if (currentGridStep % 4 === 0) {
-                candidateIdx = chordDegree % intervals.length; // Voice leading resolution
+            if (isLeapPendingResolution) {
+                // Golden Rule: Step gently in OPPOSITE direction after a leap
+                chosenDelta = leapDirection > 0 ? -1 : 1;
+                isLeapPendingResolution = false;
+            } else {
+                const markovStateKey = `${markovLeadDirectionHistory[0]}-${markovLeadDirectionHistory[1]}`;
+                const pitchTransitions = MARKOV_2ND_ORDER_LEAD[markovStateKey] || MARKOV_2ND_ORDER_LEAD['up-down'];
+                chosenDelta = rollMarkov(pitchTransitions).delta;
             }
 
-            // Update Direction History
+            // Trigger leap resolution flag if interval jump >= 3 steps
+            if (Math.abs(chosenDelta) >= 3) {
+                isLeapPendingResolution = true;
+                leapDirection = chosenDelta > 0 ? 1 : -1;
+            }
+
+            let candidateIdx = (lastMelodyNoteIdx + chosenDelta + intervals.length * 3) % intervals.length;
+            
+            // Downbeat Chord-Tone Anchoring
+            if (currentGridStep % 4 === 0) {
+                candidateIdx = chordDegree % intervals.length;
+            }
+
             const dir = candidateIdx >= lastMelodyNoteIdx ? 'up' : 'down';
             markovLeadDirectionHistory.shift();
             markovLeadDirectionHistory.push(dir);
             lastMelodyNoteIdx = candidateIdx;
 
-            // Decoupled Rhythm Markov Pick
             const rhythmTransitions = MARKOV_RHYTHM_CHAIN[markovCurrentRhythmDur] || MARKOV_RHYTHM_CHAIN[1];
             markovCurrentRhythmDur = rollMarkov(rhythmTransitions).dur;
             leadRemainingHoldSteps = markovCurrentRhythmDur;
 
-            // Pitch Synthesis
             const octave = 12 * 2;
             const melodyMidi = rootKey + octave + intervals[lastMelodyNoteIdx];
             const synthDuration = markovCurrentRhythmDur * 0.25;
@@ -596,7 +638,7 @@
         btnRun.innerText = '■ STOP';
         btnRun.classList.add('active');
 
-        const intervalMs = (60 / tempo) * 1000 / 2; // 8th note resolution
+        const intervalMs = (60 / tempo) * 1000 / 2;
         playTimer = setInterval(generateAndPlayStep, intervalMs);
     }
 
@@ -608,7 +650,7 @@
         btnRun.classList.remove('active');
     }
 
-    // --- SYNCHRONIZED MULTITRACK BINARY MIDI EXPORTER ---
+    // Multitrack MIDI Export
     function writeVarInt(val) {
         let buffer = [];
         let num = val;
@@ -622,7 +664,7 @@
     }
 
     function buildTrackChunk(events, totalSteps, isChordTrack = false) {
-        const ticksPerStep = 96; // 8th-note grid ticks
+        const ticksPerStep = 96;
         let trackBytes = [];
         let currentTick = 0;
 
@@ -664,7 +706,6 @@
             });
         }
 
-        // Align track length to exact total recording duration
         const totalDurationTicks = totalSteps * ticksPerStep;
         if (currentTick < totalDurationTicks) {
             const padDelta = totalDurationTicks - currentTick;
@@ -673,7 +714,7 @@
             trackBytes.push(0x00);
         }
 
-        trackBytes.push(0xFF, 0x2F, 0x00); // End of track
+        trackBytes.push(0xFF, 0x2F, 0x00);
 
         const len = trackBytes.length;
         const header = [
@@ -700,9 +741,9 @@
         const headerChunk = new Uint8Array([
             0x4D, 0x54, 0x68, 0x64,
             0x00, 0x00, 0x00, 0x06,
-            0x00, 0x01, // Format 1
-            0x00, 0x03, // 3 Tracks
-            0x00, 0xC0  // 192 Ticks/QN
+            0x00, 0x01,
+            0x00, 0x03,
+            0x00, 0xC0
         ]);
 
         const totalLength = headerChunk.length + leadTrack.length + chordTrack.length + bassTrack.length;
@@ -716,13 +757,13 @@
         const blob = new Blob([midiBinary], { type: 'audio/midi' });
         const downloadLink = document.createElement('a');
         downloadLink.href = URL.createObjectURL(blob);
-        downloadLink.download = `Markov_${currentGenre}_Session.mid`;
+        downloadLink.download = `Motion_${currentGenre}_Session.mid`;
         document.body.appendChild(downloadLink);
         downloadLink.click();
         document.body.removeChild(downloadLink);
     }
 
-    // --- EVENT LISTENERS ---
+    // DOM Handlers
     window.addEventListener('DOMContentLoaded', () => {
         document.getElementById('btnRun').addEventListener('click', () => {
             if (isPlaying) stopEngine();

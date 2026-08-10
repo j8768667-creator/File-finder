@@ -304,10 +304,6 @@
                 <div class="genre-chip" data-genre="LOFI">LO-FI</div>
                 <div class="genre-chip" data-genre="AMBIENT">AMBIENT</div>
                 <div class="genre-chip" data-genre="SYNTHWAVE">SYNTHWAVE</div>
-                <div class="genre-chip" data-genre="FUNK">FUNK</div>
-                <div class="genre-chip" data-genre="ROCK">ROCK</div>
-                <div class="genre-chip" data-genre="BLUES">BLUES</div>
-                <div class="genre-chip" data-genre="CLASSICAL">CLASSICAL</div>
             </div>
         </div>
 
@@ -354,7 +350,7 @@
         <div class="panel">
             <div class="panel-header">GENRE RULE SPECIFICATIONS</div>
             <div class="info-card" id="genreInfoText">
-                <b>POP ENGINE:</b> Quantized 4-chord progression (I-V-vi-IV), smooth voice leading, narrow conjunct melodic motion within 1 octave, and 2-bar motif locking.
+                <b>POP ENGINE:</b> Diatonic 4-chord loop (I-V-vi-IV), quantized beat lock, step-wise conjunct melodic motion within 1 octave, and 2-bar motif repetition.
             </div>
         </div>
     </div>
@@ -373,11 +369,11 @@
                     <div>
                         <div class="control-label"><span>KEY ROOT</span></div>
                         <select id="rootSelect">
-                            <option value="0">C</option>
+                            <option value="0" selected>C</option>
                             <option value="2">D</option>
                             <option value="4">E</option>
                             <option value="5">F</option>
-                            <option value="7" selected>G</option>
+                            <option value="7">G</option>
                             <option value="9">A</option>
                             <option value="11">B</option>
                         </select>
@@ -464,6 +460,10 @@
     let swingDelayMs = 0;
     let globalFilterFreq = 3200;
 
+    // Generative Melodic Memory State
+    let currentScaleDegreeIndex = 0; // Current position in scale for conjunct/Markov motion
+    let motifMemory = [];           // Stores 2-bar motif steps for Pop/EDM/Synthwave
+
     // MIDI Recording Storage
     let recLeadEvents = [];
     let recChordEvents = [];
@@ -483,92 +483,106 @@
             progression: [0, 4, 5, 3], scale: 'major', tempo: 120, swing: 0, chordType: 'triad',
             comping: [1, 0, 0, 0,  1, 0, 0, 0,  1, 0, 0, 0,  1, 0, 0, 0],
             bassPattern: [1, 0, 0, 0,  1, 0, 0, 0,  1, 0, 0, 0,  1, 0, 0, 0],
-            motifLock: true,
-            info: "<b>POP ENGINE:</b> Quantized 4-chord progression (I-V-vi-IV), smooth voice leading, narrow conjunct melodic motion, and 2-bar motif locking."
+            motifLock: true, motionType: 'conjunct', maxOctaveSpan: 1,
+            info: "<b>POP ENGINE:</b> Diatonic 4-chord loop (I-V-vi-IV), quantized beat lock, step-wise conjunct melodic motion within 1 octave, and 2-bar motif repetition."
         },
         EDM: {
             progression: [5, 3, 0, 4], scale: 'minor', tempo: 128, swing: 0, chordType: 'triad',
             comping: [1, 0, 1, 0,  1, 0, 1, 0,  1, 0, 1, 0,  1, 0, 1, 0],
             bassPattern: [1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1],
-            motifLock: true,
-            info: "<b>EDM ENGINE:</b> High-energy driving 16th bass, quantized off-beat chord stabs, and energetic arpeggiated motifs."
+            motifLock: true, motionType: 'conjunct', maxOctaveSpan: 1,
+            info: "<b>EDM ENGINE:</b> High-energy driving 16th bass, quantized off-beat chord stabs, step-wise conjunct melodic motion, and 2-bar repeated hooks."
         },
         JAZZ: {
             progression: [1, 4, 0, 5], scale: 'dorian', tempo: 110, swing: 28, chordType: '7th9th',
             comping: [0, 1, 0, 0,  1, 0, 0, 1,  0, 1, 0, 0,  1, 0, 1, 0],
             bassPattern: [1, 0, 1, 0,  1, 0, 1, 0,  1, 0, 1, 0,  1, 0, 1, 0],
-            motifLock: false,
-            info: "<b>JAZZ ENGINE:</b> Extended harmonies (7ths & 9ths), syncopated off-beat comping, walking basslines, and heavy behind-the-beat swing."
+            motifLock: false, motionType: 'jazz_step', maxOctaveSpan: 2,
+            info: "<b>JAZZ ENGINE:</b> Diatonic 7th/9th extensions (ii-V-I), chromatic leading-tone bass approach, syncopated off-beat comping, and micro-timing swing."
         },
         RNB: {
             progression: [1, 2, 0, 5], scale: 'minor', tempo: 88, swing: 20, chordType: '7th',
             comping: [1, 0, 0, 1,  0, 1, 0, 0,  1, 0, 0, 1,  0, 0, 1, 0],
             bassPattern: [1, 0, 0, 0,  0, 1, 0, 0,  1, 0, 0, 0,  0, 0, 1, 0],
-            motifLock: false,
-            info: "<b>R&B ENGINE:</b> Lush 7th chords, relaxed micro-timing swing, expressive melodic turns, and groove syncopation."
+            motifLock: false, motionType: 'conjunct', maxOctaveSpan: 1.5,
+            info: "<b>R&B ENGINE:</b> Lush diatonic 7th voicings, relaxed micro-timing swing, smooth voice leading, and expressive melodic turns."
         },
         CINEMATIC: {
-            progression: [0, 3, 0, 3], scale: 'major', tempo: 78, swing: 0, chordType: 'modal',
+            progression: [0, 3, 0, 3], scale: 'major', tempo: 78, swing: 0, chordType: 'modal_interchange',
             comping: [1, 0, 0, 0,  0, 0, 0, 0,  1, 0, 0, 0,  0, 0, 0, 0],
             bassPattern: [1, 0, 0, 0,  0, 0, 0, 0,  1, 0, 0, 0,  0, 0, 0, 0],
-            motifLock: false,
-            info: "<b>CINEMATIC ENGINE:</b> Borrowed modal interchange (minor iv in major), low bass pedal points, and wide octave melodic leaps."
+            motifLock: false, motionType: 'disjunct', maxOctaveSpan: 2,
+            info: "<b>CINEMATIC ENGINE:</b> Borrowed modal minor iv chord on bar 4, static bass pedal point, wide disjunct leaps, and call-and-response registers."
         },
         LOFI: {
             progression: [0, 3, 2, 5], scale: 'pentatonic', tempo: 75, swing: 18, chordType: '7th',
             comping: [1, 0, 0, 0,  0, 0, 1, 0,  0, 0, 1, 0,  0, 0, 0, 0],
             bassPattern: [1, 0, 0, 0,  0, 0, 0, 0,  1, 0, 0, 0,  0, 0, 0, 0],
-            motifLock: false,
-            info: "<b>LO-FI ENGINE:</b> Major 7th chords, pentatonic safety, gentle swing micro-timing, and relaxed non-repetitive melodic wandering."
+            motifLock: false, motionType: 'markov', maxOctaveSpan: 1,
+            info: "<b>LO-FI ENGINE:</b> Major 7th chords, strict 5-note pentatonic scale lock, gentle micro-timing swing, and Markov chain step transitions."
         },
         AMBIENT: {
             progression: [0, 5, 3, 4], scale: 'pentatonic', tempo: 60, swing: 0, chordType: 'sus',
             comping: [1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0],
             bassPattern: [1, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0],
-            motifLock: false,
-            info: "<b>AMBIENT ENGINE:</b> Unresolved suspended chords (sus2/sus4), long multi-bar holds, and generative pentatonic streams."
+            motifLock: false, motionType: 'markov', maxOctaveSpan: 1.5,
+            info: "<b>AMBIENT ENGINE:</b> Unresolved suspended (sus2/sus4) chords with slow sustained holds, pentatonic safety, and non-repetitive Markov wandering."
         },
         SYNTHWAVE: {
             progression: [5, 3, 0, 4], scale: 'minor', tempo: 124, swing: 0, chordType: 'triad',
             comping: [1, 0, 0, 1,  0, 0, 1, 0,  1, 0, 0, 1,  0, 0, 1, 0],
             bassPattern: [1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1,  1, 1, 1, 1],
-            motifLock: true,
-            info: "<b>SYNTHWAVE ENGINE:</b> 80s analog synth arpeggios, driving octave bass, and filtered sawtooth chords."
-        },
-        FUNK: {
-            progression: [0, 3, 0, 4], scale: 'mixolydian', tempo: 108, swing: 22, chordType: '7th',
-            comping: [0, 1, 1, 0,  1, 0, 1, 1,  0, 1, 1, 0,  1, 0, 1, 0],
-            bassPattern: [1, 0, 0, 1,  0, 1, 0, 0,  1, 0, 0, 1,  0, 1, 0, 0],
-            motifLock: false,
-            info: "<b>FUNK ENGINE:</b> Highly syncopated 16th-note chord stabs, dominant 7th voicings, and slap bass rhythms."
-        },
-        ROCK: {
-            progression: [0, 3, 4, 3], scale: 'major', tempo: 130, swing: 0, chordType: 'triad',
-            comping: [1, 0, 1, 0,  1, 0, 1, 0,  1, 0, 1, 0,  1, 0, 1, 0],
-            bassPattern: [1, 0, 1, 0,  1, 0, 1, 0,  1, 0, 1, 0,  1, 0, 1, 0],
-            motifLock: false,
-            info: "<b>ROCK ENGINE:</b> Power eighth-note driving rhythm, energetic pentatonic lead riffs, and direct downbeat bass."
-        },
-        BLUES: {
-            progression: [0, 3, 0, 4], scale: 'blues', tempo: 96, swing: 30, chordType: '7th',
-            comping: [1, 0, 1, 0,  1, 0, 1, 0,  1, 0, 1, 0,  1, 0, 1, 0],
-            bassPattern: [1, 0, 1, 0,  1, 0, 1, 0,  1, 0, 1, 0,  1, 0, 1, 0],
-            motifLock: false,
-            info: "<b>BLUES ENGINE:</b> Dominant 7th shuffle, blues scale inflection, heavy swing timing, and call-and-response riffs."
-        },
-        CLASSICAL: {
-            progression: [0, 3, 4, 0], scale: 'major', tempo: 100, swing: 0, chordType: 'triad',
-            comping: [1, 0, 1, 0,  1, 0, 1, 0,  1, 0, 1, 0,  1, 0, 1, 0],
-            bassPattern: [1, 0, 0, 0,  1, 0, 0, 0,  1, 0, 0, 0,  1, 0, 0, 0],
-            motifLock: true,
-            info: "<b>CLASSICAL ENGINE:</b> Alberti broken-chord accompaniment, stepwise vocal melodies, and strict functional dynamics."
+            motifLock: true, motionType: 'conjunct', maxOctaveSpan: 1,
+            info: "<b>SYNTHWAVE ENGINE:</b> Diatonic minor progression, driving 16th octave bass, 80s analog saw chords, and 2-bar locked melodic motifs."
         }
     };
 
     let prevChordPitches = [];
-    let storedMotifMelody = [];
 
     function mtof(midi) { return 440 * Math.pow(2, (midi - 69) / 12); }
+
+    // --- TRUE DIATONIC CHORD CALCULATOR ---
+    function buildDiatonicChord(rootKey, scale, scaleDegree, chordType, isBar4Modal = false) {
+        const numScaleNotes = scale.length;
+        
+        // Modal Interchange: Borrowed minor iv in a Major key
+        if (chordType === 'modal_interchange' && isBar4Modal) {
+            const ivDegree = 3; // IV step
+            const ivRoot = rootKey + scale[ivDegree];
+            return [ivRoot, ivRoot + 3, ivRoot + 7]; // Minor iv triad
+        }
+
+        // Suspended Chords for Ambient (Sus2 / Sus4)
+        if (chordType === 'sus') {
+            const chordRoot = rootKey + scale[scaleDegree % numScaleNotes];
+            return [chordRoot, chordRoot + (Math.random() > 0.5 ? 2 : 5), chordRoot + 7];
+        }
+
+        // Helper to resolve scale degree + stacking to MIDI pitch
+        function getScalePitch(degreeOffset) {
+            const targetDegree = scaleDegree + degreeOffset;
+            const octaveShift = Math.floor(targetDegree / numScaleNotes);
+            const scaleIdx = ((targetDegree % numScaleNotes) + numScaleNotes) % numScaleNotes;
+            return rootKey + scale[scaleIdx] + (octaveShift * 12);
+        }
+
+        // Build Diatonic Notes by stacking thirds in scale
+        const root = getScalePitch(0);
+        const third = getScalePitch(2);
+        const fifth = getScalePitch(4);
+
+        if (chordType === 'triad') {
+            return [root, third, fifth];
+        } else if (chordType === '7th') {
+            const seventh = getScalePitch(6);
+            return [root, third, fifth, seventh];
+        } else if (chordType === '7th9th') {
+            const seventh = getScalePitch(6);
+            const ninth = getScalePitch(1); // 9th is 2nd degree an octave up
+            return [root, third, fifth, seventh, ninth + 12];
+        }
+        return [root, third, fifth];
+    }
 
     // --- IMPULSE RESPONSE GENERATOR FOR REVERB ---
     function createReverbImpulse(context, duration = 1.8, decay = 2.0) {
@@ -591,7 +605,6 @@
         if (!audioCtx) {
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-            // Master Bus Setup
             masterCompressor = audioCtx.createDynamicsCompressor();
             masterCompressor.threshold.setValueAtTime(-12, audioCtx.currentTime);
             masterCompressor.knee.setValueAtTime(10, audioCtx.currentTime);
@@ -602,25 +615,22 @@
             masterGain = audioCtx.createGain();
             masterGain.gain.setValueAtTime(0.75, audioCtx.currentTime);
 
-            // Reverb Effect Bus
             convolverNode = audioCtx.createConvolver();
             convolverNode.buffer = createReverbImpulse(audioCtx);
             reverbGain = audioCtx.createGain();
             reverbGain.gain.setValueAtTime(0.35, audioCtx.currentTime);
 
-            // Delay Effect Bus
             delayNode = audioCtx.createDelay();
-            delayNode.delayTime.setValueAtTime(0.25, audioCtx.currentTime); // 8th note at 120bpm
+            delayNode.delayTime.setValueAtTime(0.25, audioCtx.currentTime);
             delayGain = audioCtx.createGain();
             delayGain.gain.setValueAtTime(0.20, audioCtx.currentTime);
 
-            // Routing
             convolverNode.connect(reverbGain);
             reverbGain.connect(masterGain);
 
             delayNode.connect(delayGain);
             delayGain.connect(masterGain);
-            delayGain.connect(delayNode); // Feedback loop
+            delayGain.connect(delayNode);
 
             masterGain.connect(masterCompressor);
             masterCompressor.connect(audioCtx.destination);
@@ -641,12 +651,10 @@
             osc.type = type;
             osc.frequency.setValueAtTime(freq, now);
 
-            // Filter Envelope
             filter.type = 'lowpass';
             filter.frequency.setValueAtTime(cutoff, now);
             filter.frequency.exponentialRampToValueAtTime(Math.max(100, cutoff * 0.3), now + duration);
 
-            // Gain ADSR Envelope
             gain.gain.setValueAtTime(0, now);
             gain.gain.linearRampToValueAtTime(vol, now + attack);
             gain.gain.exponentialRampToValueAtTime(vol * sustain, now + attack + decay);
@@ -656,7 +664,6 @@
             osc.connect(filter);
             filter.connect(gain);
 
-            // Audio Send Routing
             gain.connect(masterGain);
             gain.connect(convolverNode);
             gain.connect(delayNode);
@@ -729,93 +736,135 @@
         }).sort((a, b) => a - b);
     }
 
+    // --- ADVANCED GENERATIVE MELODY ENGINE ---
+    function generateMelodyPitch(rootKey, scale, rule, stepInBar, currentChordPitches, isSecondBarGroup) {
+        const numScale = scale.length;
+
+        // 1. POP / EDM / SYNTHWAVE: 2-Bar Motif Repetition + Conjunct Motion
+        if (rule.motifLock) {
+            const motifStep = stepInBar % 8; // 8 eighth-note steps in 2 bars
+            if (!isSecondBarGroup) {
+                // Generate and record 2-bar motif using conjunct (step-wise) motion
+                let stepChange = Math.random() < 0.6 ? (Math.random() < 0.5 ? 1 : -1) : 0;
+                currentScaleDegreeIndex = Math.max(0, Math.min(numScale - 1, currentScaleDegreeIndex + stepChange));
+                
+                let pitch = rootKey + 12 + scale[currentScaleDegreeIndex];
+                
+                // Chord Tone Pull Option
+                if (Math.random() < chordTonePull) {
+                    const upperChordPitches = currentChordPitches.map(p => p + 12);
+                    pitch = upperChordPitches[Math.floor(Math.random() * upperChordPitches.length)];
+                }
+
+                motifMemory[motifStep] = pitch;
+                return pitch;
+            } else {
+                // Repeat motif precisely, adjusting the final bar note to target a chord tone
+                if (motifStep === 7) {
+                    const upperChordPitches = currentChordPitches.map(p => p + 12);
+                    return upperChordPitches[0]; // Resolve to fundamental chord tone
+                }
+                return motifMemory[motifStep] || (rootKey + 12 + scale[0]);
+            }
+        }
+
+        // 2. LO-FI / AMBIENT: Markov Chain State-Transition Probabilities
+        if (rule.motionType === 'markov') {
+            // Transition matrix probabilities: 50% step adjacent, 30% stay, 20% skip step
+            const rand = Math.random();
+            if (rand < 0.5) {
+                currentScaleDegreeIndex += (Math.random() < 0.5 ? 1 : -1);
+            } else if (rand > 0.8) {
+                currentScaleDegreeIndex += (Math.random() < 0.5 ? 2 : -2);
+            }
+            // Clamp within scale range
+            currentScaleDegreeIndex = ((currentScaleDegreeIndex % numScale) + numScale) % numScale;
+            return rootKey + 12 + scale[currentScaleDegreeIndex];
+        }
+
+        // 3. CINEMATIC: Disjunct Wide Interval Leaps & Call-and-Response
+        if (rule.motionType === 'disjunct') {
+            // Call (Beat 1-2): High Register Flute / Lead timbre
+            // Response (Beat 3-4): Lower Register Violin response
+            const isCall = stepInBar < 8;
+            const octaveOffset = isCall ? 24 : 12;
+            const randIdx = Math.floor(Math.random() * numScale);
+            return rootKey + octaveOffset + scale[randIdx];
+        }
+
+        // 4. JAZZ / R&B: Step Motion + Chord Tone Pull
+        if (Math.random() < chordTonePull) {
+            const upperChordPitches = currentChordPitches.map(p => p + 12);
+            return upperChordPitches[Math.floor(Math.random() * upperChordPitches.length)];
+        }
+
+        currentScaleDegreeIndex = Math.max(0, Math.min(numScale - 1, currentScaleDegreeIndex + (Math.random() < 0.5 ? 1 : -1)));
+        return rootKey + 12 + scale[currentScaleDegreeIndex];
+    }
+
     // --- GENERATIVE STEP LOOP ---
     function tick() {
         const rule = GENRE_RULES[currentGenre] || GENRE_RULES.POP;
         const rootKey = parseInt(document.getElementById('rootSelect').value) + 48; // C3 Base
         const scaleType = document.getElementById('scaleSelect').value;
-        const intervals = SCALES[scaleType] || SCALES.major;
+        const scale = SCALES[scaleType] || SCALES.major;
 
         const chordSound = document.getElementById('chordSoundSelect').value;
         const bassSound = document.getElementById('bassSoundSelect').value;
 
         const stepInBar = gridStep % 16;
-        const barIdx = Math.floor(gridStep / 4) % rule.progression.length;
-        const nextBarIdx = (barIdx + 1) % rule.progression.length;
+        const totalBarIdx = Math.floor(gridStep / 16);
+        const barInProgression = totalBarIdx % rule.progression.length;
+        const nextBarInProgression = (barInProgression + 1) % rule.progression.length;
 
-        const chordDegree = rule.progression[barIdx];
-        const nextChordDegree = rule.progression[nextBarIdx];
+        const scaleDegree = rule.progression[barInProgression];
+        const nextScaleDegree = rule.progression[nextBarInProgression];
 
-        const chordRootMidi = rootKey + intervals[chordDegree % intervals.length];
-        const nextChordRootMidi = rootKey + intervals[nextChordDegree % intervals.length];
+        const isBar4Modal = (barInProgression === 3 && rule.chordType === 'modal_interchange');
 
-        // 1. Chords
-        let rawChordNotes = [];
-        if (rule.chordType === '7th9th') {
-            rawChordNotes = [chordRootMidi, chordRootMidi + 4, chordRootMidi + 7, chordRootMidi + 11, chordRootMidi + 14];
-        } else if (rule.chordType === '7th') {
-            rawChordNotes = [chordRootMidi, chordRootMidi + 4, chordRootMidi + 7, chordRootMidi + 10];
-        } else if (rule.chordType === 'sus') {
-            rawChordNotes = [chordRootMidi, chordRootMidi + 2, chordRootMidi + 7];
-        } else if (rule.chordType === 'modal' && barIdx === 3) {
-            const ivRoot = rootKey + intervals[3];
-            rawChordNotes = [ivRoot, ivRoot + 3, ivRoot + 7]; // Minor iv
-        } else {
-            rawChordNotes = [chordRootMidi, chordRootMidi + 4, chordRootMidi + 7];
-        }
-
+        // 1. DIATONIC CHORD CALCULATION
+        const rawChordNotes = buildDiatonicChord(rootKey, scale, scaleDegree, rule.chordType, isBar4Modal);
         const voicedChord = voiceLead(rawChordNotes, prevChordPitches);
         prevChordPitches = voicedChord;
 
         const isOffBeat = stepInBar % 2 !== 0;
         const actualDelay = isOffBeat ? swingDelayMs : 0;
 
+        // Play Chord Track
         if (chordsEnabled && rule.comping[stepInBar] === 1) {
             playChordVoice(voicedChord, chordSound, 0.45, 0.08);
             if (isRecording) recChordEvents.push({ step: totalRecordedSteps, pitches: voicedChord, duration: 2 });
         }
 
-        // 2. Bass
+        // 2. BASS ENGINE (Pedal Points & Chromatic Approach)
         if (bassEnabled && rule.bassPattern[stepInBar] === 1) {
-            let bassMidi = chordRootMidi - 12;
-            if ((currentGenre === 'JAZZ' || currentGenre === 'BLUES') && stepInBar % 4 === 3) {
-                bassMidi = (nextChordRootMidi - 12) - 1; // Chromatic target approach
-            } else if (currentGenre === 'CINEMATIC') {
+            let bassMidi = voicedChord[0] - 12; // Fundamental bass note
+
+            // Cinematic Pedal Point Rule: Bass holds fixed root key
+            if (currentGenre === 'CINEMATIC') {
                 bassMidi = rootKey - 12;
+            }
+            // Jazz / Blues Chromatic Approach Rule on Beat 4 (Step 14)
+            else if ((currentGenre === 'JAZZ' || currentGenre === 'BLUES') && stepInBar === 14) {
+                const nextChordNotes = buildDiatonicChord(rootKey, scale, nextScaleDegree, rule.chordType);
+                const nextBassRoot = nextChordNotes[0] - 12;
+                bassMidi = nextBassRoot - 1; // Chromatic leading tone from below
             }
 
             playBassVoice(bassMidi, bassSound, 0.35, 0.18);
             if (isRecording) recBassEvents.push({ step: totalRecordedSteps, pitch: bassMidi, duration: 2 });
         }
 
-        // 3. Melody
+        // 3. MELODY ENGINE
         if (stepInBar % 2 === 0) {
-            let melodyMidi = chordRootMidi + 12;
-
-            if (rule.motifLock) {
-                if (gridStep < 8) {
-                    let idx = Math.floor(Math.random() * intervals.length);
-                    melodyMidi = rootKey + 12 + intervals[idx];
-                    storedMotifMelody[stepInBar] = melodyMidi;
-                } else {
-                    melodyMidi = storedMotifMelody[stepInBar % 8] || (rootKey + 12);
-                    if (stepInBar === 6) melodyMidi = chordRootMidi + 12;
-                }
-            } else {
-                let scaleIdx = Math.floor(Math.random() * intervals.length);
-                if (Math.random() < chordTonePull) {
-                    const chordPitchesUpper = voicedChord.map(p => p + 12);
-                    melodyMidi = chordPitchesUpper[Math.floor(Math.random() * chordPitchesUpper.length)];
-                } else {
-                    melodyMidi = rootKey + 12 + intervals[scaleIdx];
-                }
-            }
+            const isSecondBarGroup = (totalBarIdx % 2 !== 0);
+            const melodyMidi = generateMelodyPitch(rootKey, scale, rule, stepInBar, voicedChord, isSecondBarGroup);
 
             playLeadVoice(melodyMidi, leadSound, 0.22, 0.15, actualDelay);
             if (isRecording) recLeadEvents.push({ step: totalRecordedSteps, pitch: melodyMidi, duration: 2 });
         }
 
-        gridStep = (gridStep + 1) % 16;
+        gridStep = (gridStep + 1) % 64; // Loop 4 full bars (64 16th steps)
         if (isRecording) totalRecordedSteps++;
     }
 
@@ -843,7 +892,6 @@
         function buildTrackChunk(events) {
             let trackBytes = [];
             
-            // Set Tempo Meta Event (500000 microseconds per quarter note default)
             const tempoMicro = Math.round(60000000 / tempo);
             trackBytes.push(0x00, 0xFF, 0x51, 0x03, (tempoMicro >> 16) & 0xFF, (tempoMicro >> 8) & 0xFF, tempoMicro & 0xFF);
 
@@ -865,10 +913,8 @@
                 }
             });
 
-            // End of Track
             trackBytes.push(0x00, 0xFF, 0x2F, 0x00);
 
-            // MTrk header
             let len = trackBytes.length;
             let header = [0x4D, 0x54, 0x72, 0x6B, (len >> 24) & 0xFF, (len >> 16) & 0xFF, (len >> 8) & 0xFF, len & 0xFF];
             return header.concat(trackBytes);
@@ -876,7 +922,6 @@
 
         let midiEvents = [];
 
-        // Convert Lead Events (Channel 0)
         recLeadEvents.forEach(e => {
             let startTick = e.step * ticksPerStep;
             let endTick = startTick + (e.duration * ticksPerStep);
@@ -884,7 +929,6 @@
             midiEvents.push({ tick: endTick, type: 'off', channel: 0, pitch: e.pitch, velocity: 0 });
         });
 
-        // Convert Chord Events (Channel 1)
         recChordEvents.forEach(e => {
             let startTick = e.step * ticksPerStep;
             let endTick = startTick + (e.duration * ticksPerStep);
@@ -894,7 +938,6 @@
             });
         });
 
-        // Convert Bass Events (Channel 2)
         recBassEvents.forEach(e => {
             let startTick = e.step * ticksPerStep;
             let endTick = startTick + (e.duration * ticksPerStep);
@@ -904,13 +947,12 @@
 
         let trackChunk = buildTrackChunk(midiEvents);
 
-        // Header Chunk: MThd, len=6, format=0 (single track), tracks=1, division=96
         let headerChunk = [
-            0x4D, 0x54, 0x68, 0x64, // MThd
-            0x00, 0x00, 0x00, 0x06, // Length 6
-            0x00, 0x00,             // Format 0
-            0x00, 0x01,             // 1 track
-            0x00, 0x60              // 96 TPQN
+            0x4D, 0x54, 0x68, 0x64,
+            0x00, 0x00, 0x00, 0x06,
+            0x00, 0x00,
+            0x00, 0x01,
+            0x00, 0x60
         ];
 
         let fullMidiFile = new Uint8Array(headerChunk.concat(trackChunk));
@@ -977,7 +1019,6 @@
             }
         });
 
-        // Genre Selector Chips
         document.querySelectorAll('#genreButtons .genre-chip').forEach(btn => {
             btn.addEventListener('click', () => {
                 document.querySelectorAll('#genreButtons .genre-chip').forEach(b => b.classList.remove('active'));

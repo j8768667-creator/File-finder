@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Generative Music Engine & MIDI Studio</title>
+    <title>Generative Music Studio & Audio Engine</title>
     <style>
         :root {
             --bg-color: #121816;
@@ -313,8 +313,8 @@
             <div class="control-group">
                 <div class="control-label"><span>LEAD INSTRUMENT</span></div>
                 <select id="waveSelect">
-                    <option value="piano" selected>Acoustic Grand Piano</option>
-                    <option value="lead">Warm Poly Synth Lead</option>
+                    <option value="piano" selected>Warm Acoustic Grand Piano</option>
+                    <option value="lead">Analog Detuned Poly Lead</option>
                     <option value="pluck">Soft Plucked Strings</option>
                     <option value="fm">FM Crystal Bell</option>
                 </select>
@@ -325,7 +325,7 @@
                     <div>
                         <div class="control-label"><span>CHORD TRACK</span></div>
                         <select id="chordSoundSelect">
-                            <option value="warm" selected>Warm Analog Pad</option>
+                            <option value="warm" selected>Warm Analog Synth Pad</option>
                             <option value="piano">Soft Piano Chords</option>
                             <option value="epiano">Rhodes E-Piano</option>
                         </select>
@@ -333,8 +333,8 @@
                     <div>
                         <div class="control-label"><span>BASS TRACK</span></div>
                         <select id="bassSoundSelect">
-                            <option value="sub" selected>Warm Sub Bass</option>
-                            <option value="fm">FM Punch Bass</option>
+                            <option value="sub" selected>Clean Triangle Sub-Bass</option>
+                            <option value="fm">FM Knock Bass</option>
                             <option value="upright">Upright Acoustic Bass</option>
                         </select>
                     </div>
@@ -435,7 +435,7 @@
 </div>
 
 <script>
-    // --- AUDIO CONTEXT & BUS ARCHITECTURE ---
+    // --- MASTER AUDIO BUS ARCHITECTURE ---
     let audioCtx = null;
     let masterGain = null;
     let masterCompressor = null;
@@ -450,7 +450,7 @@
     let currentGenre = 'POP';
     let tempo = 120;
     let playTimer = null;
-    let gridStep = 0; // 16 steps per bar loop
+    let gridStep = 0; 
     let totalRecordedSteps = 0;
 
     let chordsEnabled = true;
@@ -461,8 +461,8 @@
     let globalFilterFreq = 3200;
 
     // Generative Melodic Memory State
-    let currentScaleDegreeIndex = 0; // Current position in scale for conjunct/Markov motion
-    let motifMemory = [];           // Stores 2-bar motif steps for Pop/EDM/Synthwave
+    let currentScaleDegreeIndex = 0; 
+    let motifMemory = [];           
 
     // MIDI Recording Storage
     let recLeadEvents = [];
@@ -541,24 +541,21 @@
 
     function mtof(midi) { return 440 * Math.pow(2, (midi - 69) / 12); }
 
-    // --- TRUE DIATONIC CHORD CALCULATOR ---
+    // --- DIATONIC CHORD CALCULATOR ---
     function buildDiatonicChord(rootKey, scale, scaleDegree, chordType, isBar4Modal = false) {
         const numScaleNotes = scale.length;
         
-        // Modal Interchange: Borrowed minor iv in a Major key
         if (chordType === 'modal_interchange' && isBar4Modal) {
-            const ivDegree = 3; // IV step
+            const ivDegree = 3; 
             const ivRoot = rootKey + scale[ivDegree];
-            return [ivRoot, ivRoot + 3, ivRoot + 7]; // Minor iv triad
+            return [ivRoot, ivRoot + 3, ivRoot + 7]; 
         }
 
-        // Suspended Chords for Ambient (Sus2 / Sus4)
         if (chordType === 'sus') {
             const chordRoot = rootKey + scale[scaleDegree % numScaleNotes];
             return [chordRoot, chordRoot + (Math.random() > 0.5 ? 2 : 5), chordRoot + 7];
         }
 
-        // Helper to resolve scale degree + stacking to MIDI pitch
         function getScalePitch(degreeOffset) {
             const targetDegree = scaleDegree + degreeOffset;
             const octaveShift = Math.floor(targetDegree / numScaleNotes);
@@ -566,7 +563,6 @@
             return rootKey + scale[scaleIdx] + (octaveShift * 12);
         }
 
-        // Build Diatonic Notes by stacking thirds in scale
         const root = getScalePitch(0);
         const third = getScalePitch(2);
         const fifth = getScalePitch(4);
@@ -578,14 +574,14 @@
             return [root, third, fifth, seventh];
         } else if (chordType === '7th9th') {
             const seventh = getScalePitch(6);
-            const ninth = getScalePitch(1); // 9th is 2nd degree an octave up
+            const ninth = getScalePitch(1); 
             return [root, third, fifth, seventh, ninth + 12];
         }
         return [root, third, fifth];
     }
 
     // --- IMPULSE RESPONSE GENERATOR FOR REVERB ---
-    function createReverbImpulse(context, duration = 1.8, decay = 2.0) {
+    function createReverbImpulse(context, duration = 2.0, decay = 2.5) {
         const rate = context.sampleRate;
         const length = rate * duration;
         const impulse = context.createBuffer(2, length, rate);
@@ -605,25 +601,26 @@
         if (!audioCtx) {
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
+            // 1. MASTER BRICKWALL COMPRESSOR / LIMITER (Prevents Distortion in Sound.wav)
             masterCompressor = audioCtx.createDynamicsCompressor();
-            masterCompressor.threshold.setValueAtTime(-12, audioCtx.currentTime);
-            masterCompressor.knee.setValueAtTime(10, audioCtx.currentTime);
-            masterCompressor.ratio.setValueAtTime(4, audioCtx.currentTime);
-            masterCompressor.attack.setValueAtTime(0.005, audioCtx.currentTime);
+            masterCompressor.threshold.setValueAtTime(-6.0, audioCtx.currentTime);
+            masterCompressor.knee.setValueAtTime(0, audioCtx.currentTime);
+            masterCompressor.ratio.setValueAtTime(20.0, audioCtx.currentTime);
+            masterCompressor.attack.setValueAtTime(0.003, audioCtx.currentTime);
             masterCompressor.release.setValueAtTime(0.1, audioCtx.currentTime);
 
             masterGain = audioCtx.createGain();
-            masterGain.gain.setValueAtTime(0.75, audioCtx.currentTime);
+            masterGain.gain.setValueAtTime(0.70, audioCtx.currentTime);
 
             convolverNode = audioCtx.createConvolver();
             convolverNode.buffer = createReverbImpulse(audioCtx);
             reverbGain = audioCtx.createGain();
-            reverbGain.gain.setValueAtTime(0.35, audioCtx.currentTime);
+            reverbGain.gain.setValueAtTime(0.25, audioCtx.currentTime);
 
             delayNode = audioCtx.createDelay();
             delayNode.delayTime.setValueAtTime(0.25, audioCtx.currentTime);
             delayGain = audioCtx.createGain();
-            delayGain.gain.setValueAtTime(0.20, audioCtx.currentTime);
+            delayGain.gain.setValueAtTime(0.15, audioCtx.currentTime);
 
             convolverNode.connect(reverbGain);
             reverbGain.connect(masterGain);
@@ -637,55 +634,64 @@
         }
     }
 
-    // --- HIGH QUALITY FILTERED ADSR SYNTH VOICE ---
-    function playPolishedTone(freq, type, duration, vol, delayMs = 0, attack = 0.02, decay = 0.15, sustain = 0.6, release = 0.25, cutoff = 3200) {
+    // --- ENHANCED DUAL-OSCILLATOR SYNTH ENGINE (EXPONENTIAL ADSR + FILTER) ---
+    function playPolishedTone(freq, type1, type2, duration, vol, delayMs = 0, attack = 0.015, decay = 0.12, sustain = 0.4, release = 0.2, cutoff = 3200) {
         if (!audioCtx) return;
 
         setTimeout(() => {
             const now = audioCtx.currentTime;
 
-            const osc = audioCtx.createOscillator();
+            const osc1 = audioCtx.createOscillator();
+            const osc2 = audioCtx.createOscillator();
             const filter = audioCtx.createBiquadFilter();
             const gain = audioCtx.createGain();
 
-            osc.type = type;
-            osc.frequency.setValueAtTime(freq, now);
+            osc1.type = type1;
+            osc2.type = type2 || type1;
 
+            // Micro-detuning (+5 cents) for thick stereo warmth
+            osc1.frequency.setValueAtTime(freq, now);
+            osc2.frequency.setValueAtTime(freq * 1.003, now);
+
+            // Dynamic low-pass filter envelope
             filter.type = 'lowpass';
             filter.frequency.setValueAtTime(cutoff, now);
-            filter.frequency.exponentialRampToValueAtTime(Math.max(100, cutoff * 0.3), now + duration);
+            filter.frequency.exponentialRampToValueAtTime(Math.max(120, cutoff * 0.25), now + duration);
 
-            gain.gain.setValueAtTime(0, now);
+            // Exponential Amplitude Envelope (ADSR)
+            gain.gain.setValueAtTime(0.0001, now);
             gain.gain.linearRampToValueAtTime(vol, now + attack);
-            gain.gain.exponentialRampToValueAtTime(vol * sustain, now + attack + decay);
-            gain.gain.setValueAtTime(vol * sustain, now + duration);
+            gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, vol * sustain), now + attack + decay);
+            gain.gain.setValueAtTime(Math.max(0.0001, vol * sustain), now + duration);
             gain.gain.exponentialRampToValueAtTime(0.0001, now + duration + release);
 
-            osc.connect(filter);
+            osc1.connect(filter);
+            osc2.connect(filter);
             filter.connect(gain);
 
             gain.connect(masterGain);
             gain.connect(convolverNode);
             gain.connect(delayNode);
 
-            osc.start(now);
-            osc.stop(now + duration + release + 0.1);
+            osc1.start(now);
+            osc2.start(now);
+            osc1.stop(now + duration + release + 0.05);
+            osc2.stop(now + duration + release + 0.05);
         }, delayMs);
     }
 
     function playLeadVoice(midiPitch, instrument, duration, vol, delayMs = 0) {
         const freq = mtof(midiPitch);
         if (instrument === 'piano') {
-            playPolishedTone(freq, 'triangle', duration, vol * 1.1, delayMs, 0.008, 0.12, 0.4, 0.3, globalFilterFreq);
-            playPolishedTone(freq * 0.5, 'sine', duration, vol * 0.3, delayMs, 0.008, 0.15, 0.2, 0.3, globalFilterFreq * 0.5);
+            // Warm Dual-Tone Piano
+            playPolishedTone(freq, 'triangle', 'sine', duration, vol * 0.20, delayMs, 0.008, 0.15, 0.3, 0.25, globalFilterFreq);
         } else if (instrument === 'lead') {
-            playPolishedTone(freq, 'sawtooth', duration, vol * 0.7, delayMs, 0.02, 0.1, 0.7, 0.2, globalFilterFreq);
-            playPolishedTone(freq * 1.005, 'sawtooth', duration, vol * 0.5, delayMs, 0.02, 0.1, 0.7, 0.2, globalFilterFreq);
+            // Supersaw Poly Lead
+            playPolishedTone(freq, 'sawtooth', 'square', duration, vol * 0.14, delayMs, 0.02, 0.1, 0.6, 0.2, globalFilterFreq);
         } else if (instrument === 'pluck') {
-            playPolishedTone(freq, 'sine', duration * 0.5, vol * 1.2, delayMs, 0.003, 0.08, 0.1, 0.1, globalFilterFreq * 1.2);
+            playPolishedTone(freq, 'sine', 'triangle', duration * 0.5, vol * 0.22, delayMs, 0.003, 0.08, 0.1, 0.1, globalFilterFreq * 1.2);
         } else { // FM Bell
-            playPolishedTone(freq, 'sine', duration, vol * 0.9, delayMs, 0.005, 0.2, 0.3, 0.4, globalFilterFreq);
-            playPolishedTone(freq * 2.01, 'sine', duration * 0.6, vol * 0.4, delayMs, 0.005, 0.1, 0.1, 0.2, globalFilterFreq * 1.5);
+            playPolishedTone(freq, 'sine', 'sine', duration, vol * 0.18, delayMs, 0.005, 0.2, 0.3, 0.4, globalFilterFreq);
         }
     }
 
@@ -693,13 +699,11 @@
         midiPitches.forEach((pitch, i) => {
             const freq = mtof(pitch);
             if (soundType === 'warm') {
-                playPolishedTone(freq, 'sawtooth', duration, vol * 0.3, i * 12, 0.06, 0.2, 0.8, 0.4, globalFilterFreq * 0.7);
-                playPolishedTone(freq * 0.997, 'triangle', duration, vol * 0.4, i * 12, 0.06, 0.2, 0.8, 0.4, globalFilterFreq * 0.7);
+                playPolishedTone(freq, 'sawtooth', 'triangle', duration, vol * 0.08, i * 12, 0.05, 0.2, 0.7, 0.4, globalFilterFreq * 0.6);
             } else if (soundType === 'epiano') {
-                playPolishedTone(freq, 'sine', duration, vol * 0.8, i * 10, 0.01, 0.15, 0.4, 0.3, globalFilterFreq);
-                playPolishedTone(freq * 3, 'sine', duration * 0.3, vol * 0.2, i * 10, 0.005, 0.05, 0.1, 0.1, globalFilterFreq);
+                playPolishedTone(freq, 'sine', 'triangle', duration, vol * 0.15, i * 10, 0.01, 0.15, 0.4, 0.3, globalFilterFreq);
             } else { // Soft Piano
-                playPolishedTone(freq, 'triangle', duration, vol * 0.7, i * 8, 0.01, 0.1, 0.3, 0.25, globalFilterFreq * 0.8);
+                playPolishedTone(freq, 'triangle', 'sine', duration, vol * 0.14, i * 8, 0.01, 0.1, 0.3, 0.25, globalFilterFreq * 0.8);
             }
         });
     }
@@ -707,13 +711,12 @@
     function playBassVoice(midiPitch, soundType, duration, vol) {
         const freq = mtof(midiPitch);
         if (soundType === 'sub') {
-            playPolishedTone(freq, 'sine', duration, vol * 1.4, 0, 0.015, 0.1, 0.8, 0.2, 600);
-            playPolishedTone(freq * 2, 'triangle', duration * 0.7, vol * 0.3, 0, 0.015, 0.1, 0.4, 0.15, 800);
+            // Clean Triangle Sub (Fixes Sound.wav distortion)
+            playPolishedTone(freq, 'triangle', 'sine', duration, vol * 0.28, 0, 0.015, 0.1, 0.8, 0.2, 500);
         } else if (soundType === 'upright') {
-            playPolishedTone(freq, 'triangle', duration, vol * 1.0, 0, 0.008, 0.12, 0.3, 0.2, 1200);
+            playPolishedTone(freq, 'triangle', 'triangle', duration, vol * 0.22, 0, 0.008, 0.12, 0.3, 0.2, 900);
         } else { // FM Knock
-            playPolishedTone(freq, 'square', duration * 0.7, vol * 0.8, 0, 0.005, 0.08, 0.3, 0.15, 1800);
-            playPolishedTone(freq * 0.5, 'sine', duration, vol * 0.6, 0, 0.01, 0.1, 0.6, 0.2, 400);
+            playPolishedTone(freq, 'square', 'sine', duration * 0.7, vol * 0.18, 0, 0.005, 0.08, 0.3, 0.15, 1400);
         }
     }
 
@@ -740,17 +743,14 @@
     function generateMelodyPitch(rootKey, scale, rule, stepInBar, currentChordPitches, isSecondBarGroup) {
         const numScale = scale.length;
 
-        // 1. POP / EDM / SYNTHWAVE: 2-Bar Motif Repetition + Conjunct Motion
         if (rule.motifLock) {
-            const motifStep = stepInBar % 8; // 8 eighth-note steps in 2 bars
+            const motifStep = stepInBar % 8; 
             if (!isSecondBarGroup) {
-                // Generate and record 2-bar motif using conjunct (step-wise) motion
                 let stepChange = Math.random() < 0.6 ? (Math.random() < 0.5 ? 1 : -1) : 0;
                 currentScaleDegreeIndex = Math.max(0, Math.min(numScale - 1, currentScaleDegreeIndex + stepChange));
                 
                 let pitch = rootKey + 12 + scale[currentScaleDegreeIndex];
                 
-                // Chord Tone Pull Option
                 if (Math.random() < chordTonePull) {
                     const upperChordPitches = currentChordPitches.map(p => p + 12);
                     pitch = upperChordPitches[Math.floor(Math.random() * upperChordPitches.length)];
@@ -759,40 +759,32 @@
                 motifMemory[motifStep] = pitch;
                 return pitch;
             } else {
-                // Repeat motif precisely, adjusting the final bar note to target a chord tone
                 if (motifStep === 7) {
                     const upperChordPitches = currentChordPitches.map(p => p + 12);
-                    return upperChordPitches[0]; // Resolve to fundamental chord tone
+                    return upperChordPitches[0]; 
                 }
                 return motifMemory[motifStep] || (rootKey + 12 + scale[0]);
             }
         }
 
-        // 2. LO-FI / AMBIENT: Markov Chain State-Transition Probabilities
         if (rule.motionType === 'markov') {
-            // Transition matrix probabilities: 50% step adjacent, 30% stay, 20% skip step
             const rand = Math.random();
             if (rand < 0.5) {
                 currentScaleDegreeIndex += (Math.random() < 0.5 ? 1 : -1);
             } else if (rand > 0.8) {
                 currentScaleDegreeIndex += (Math.random() < 0.5 ? 2 : -2);
             }
-            // Clamp within scale range
             currentScaleDegreeIndex = ((currentScaleDegreeIndex % numScale) + numScale) % numScale;
             return rootKey + 12 + scale[currentScaleDegreeIndex];
         }
 
-        // 3. CINEMATIC: Disjunct Wide Interval Leaps & Call-and-Response
         if (rule.motionType === 'disjunct') {
-            // Call (Beat 1-2): High Register Flute / Lead timbre
-            // Response (Beat 3-4): Lower Register Violin response
             const isCall = stepInBar < 8;
             const octaveOffset = isCall ? 24 : 12;
             const randIdx = Math.floor(Math.random() * numScale);
             return rootKey + octaveOffset + scale[randIdx];
         }
 
-        // 4. JAZZ / R&B: Step Motion + Chord Tone Pull
         if (Math.random() < chordTonePull) {
             const upperChordPitches = currentChordPitches.map(p => p + 12);
             return upperChordPitches[Math.floor(Math.random() * upperChordPitches.length)];
@@ -805,7 +797,7 @@
     // --- GENERATIVE STEP LOOP ---
     function tick() {
         const rule = GENRE_RULES[currentGenre] || GENRE_RULES.POP;
-        const rootKey = parseInt(document.getElementById('rootSelect').value) + 48; // C3 Base
+        const rootKey = parseInt(document.getElementById('rootSelect').value) + 48; // C3
         const scaleType = document.getElementById('scaleSelect').value;
         const scale = SCALES[scaleType] || SCALES.major;
 
@@ -822,7 +814,7 @@
 
         const isBar4Modal = (barInProgression === 3 && rule.chordType === 'modal_interchange');
 
-        // 1. DIATONIC CHORD CALCULATION
+        // Diatonic Chord Calculation
         const rawChordNotes = buildDiatonicChord(rootKey, scale, scaleDegree, rule.chordType, isBar4Modal);
         const voicedChord = voiceLead(rawChordNotes, prevChordPitches);
         prevChordPitches = voicedChord;
@@ -832,43 +824,40 @@
 
         // Play Chord Track
         if (chordsEnabled && rule.comping[stepInBar] === 1) {
-            playChordVoice(voicedChord, chordSound, 0.45, 0.08);
+            playChordVoice(voicedChord, chordSound, 0.45, 0.8);
             if (isRecording) recChordEvents.push({ step: totalRecordedSteps, pitches: voicedChord, duration: 2 });
         }
 
-        // 2. BASS ENGINE (Pedal Points & Chromatic Approach)
+        // Bass Engine
         if (bassEnabled && rule.bassPattern[stepInBar] === 1) {
-            let bassMidi = voicedChord[0] - 12; // Fundamental bass note
+            let bassMidi = voicedChord[0] - 12; 
 
-            // Cinematic Pedal Point Rule: Bass holds fixed root key
             if (currentGenre === 'CINEMATIC') {
                 bassMidi = rootKey - 12;
-            }
-            // Jazz / Blues Chromatic Approach Rule on Beat 4 (Step 14)
-            else if ((currentGenre === 'JAZZ' || currentGenre === 'BLUES') && stepInBar === 14) {
+            } else if ((currentGenre === 'JAZZ' || currentGenre === 'BLUES') && stepInBar === 14) {
                 const nextChordNotes = buildDiatonicChord(rootKey, scale, nextScaleDegree, rule.chordType);
                 const nextBassRoot = nextChordNotes[0] - 12;
-                bassMidi = nextBassRoot - 1; // Chromatic leading tone from below
+                bassMidi = nextBassRoot - 1; 
             }
 
-            playBassVoice(bassMidi, bassSound, 0.35, 0.18);
+            playBassVoice(bassMidi, bassSound, 0.35, 1.0);
             if (isRecording) recBassEvents.push({ step: totalRecordedSteps, pitch: bassMidi, duration: 2 });
         }
 
-        // 3. MELODY ENGINE
+        // Melody Engine
         if (stepInBar % 2 === 0) {
             const isSecondBarGroup = (totalBarIdx % 2 !== 0);
             const melodyMidi = generateMelodyPitch(rootKey, scale, rule, stepInBar, voicedChord, isSecondBarGroup);
 
-            playLeadVoice(melodyMidi, leadSound, 0.22, 0.15, actualDelay);
+            playLeadVoice(melodyMidi, leadSound, 0.22, 1.0, actualDelay);
             if (isRecording) recLeadEvents.push({ step: totalRecordedSteps, pitch: melodyMidi, duration: 2 });
         }
 
-        gridStep = (gridStep + 1) % 64; // Loop 4 full bars (64 16th steps)
+        gridStep = (gridStep + 1) % 64; 
         if (isRecording) totalRecordedSteps++;
     }
 
-    // --- STANDALONE VANILLA JS PURE BINARY MIDI EXPORTER ---
+    // --- PURE VANILLA JS BINARY MIDI EXPORTER ---
     function generateAndDownloadMidi() {
         const ticksPerQuarter = 96;
         const ticksPerStep = ticksPerQuarter / 2; // 16th step = 48 ticks

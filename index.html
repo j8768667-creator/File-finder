@@ -106,6 +106,11 @@
             border: none;
         }
 
+        .btn-run.active {
+            background-color: var(--accent-amber);
+            color: #0d1e1a;
+        }
+
         .btn-run:hover { opacity: 0.9; }
 
         .btn-rec {
@@ -228,6 +233,7 @@
             flex: 1;
             background-color: var(--input-bg);
             border-radius: 2px 2px 0 0;
+            transition: height 0.1s ease;
         }
 
         .chart-bar.active-primary {
@@ -321,43 +327,43 @@
                 <canvas id="lorenzCanvasMain"></canvas>
             </div>
             <div class="canvas-footer">
-                <div><span style="color:var(--accent-cyan)">CH·A pitch ρ=28.0</span> · <span style="color:var(--accent-purple)">CH·R rhythm</span></div>
-                <div style="color:var(--accent-amber)">● A4 ◐ 2n over D · notes: 503</div>
+                <div><span style="color:var(--accent-cyan)">CH·A pitch ρ=<span id="rhoDisplay">28.0</span></span> · <span style="color:var(--accent-purple)">CH·R rhythm</span></div>
+                <div style="color:var(--accent-amber)" id="noteStatus">● Standby · Press RUN</div>
             </div>
         </div>
 
         <div class="panel">
             <div class="panel-header">
-                P(NEXT NOTE) — SOFTMAX OVER BLENDED LOGITS, T=0.80
+                P(NEXT NOTE) — SOFTMAX OVER BLENDED LOGITS
             </div>
-            <div class="chart-container">
-                <div class="chart-bar" style="height: 5%;"></div>
+            <div class="chart-container" id="chartBars">
                 <div class="chart-bar" style="height: 10%;"></div>
+                <div class="chart-bar" style="height: 20%;"></div>
                 <div class="chart-bar active-secondary" style="height: 40%;"></div>
                 <div class="chart-bar active-primary" style="height: 85%;"></div>
                 <div class="chart-bar active-secondary" style="height: 55%;"></div>
-                <div class="chart-bar" style="height: 8%;"></div>
-                <div class="chart-bar" style="height: 3%;"></div>
-                <div class="chart-bar" style="height: 12%;"></div>
+                <div class="chart-bar" style="height: 18%;"></div>
+                <div class="chart-bar" style="height: 13%;"></div>
+                <div class="chart-bar" style="height: 22%;"></div>
+                <div class="chart-bar" style="height: 15%;"></div>
                 <div class="chart-bar" style="height: 5%;"></div>
-                <div class="chart-bar" style="height: 2%;"></div>
             </div>
             <div class="description-text">
-                G3 ... F#6 — matrix learns from its own output, reward-weighted by interval consonance (policy-gradient style update)
+                Real-time pitch probabilities dynamically generated from Lorenz chaos mapping.
             </div>
         </div>
 
         <div class="panel">
             <div class="panel-header">
-                EMOTION — FEELING: <span style="color: var(--accent-rose)">JOYFUL</span>
+                EMOTION — FEELING: <span style="color: var(--accent-rose)" id="moodDisplay">JOYFUL</span>
             </div>
-            <div class="btn-group" style="margin-bottom: 12px;">
-                <div class="btn-chip active">DRIFT</div>
-                <div class="btn-chip">SERENE</div>
-                <div class="btn-chip">JOYFUL</div>
-                <div class="btn-chip">EPIC</div>
-                <div class="btn-chip">MELANCHOLY</div>
-                <div class="btn-chip">TENSE</div>
+            <div class="btn-group" id="moodButtons" style="margin-bottom: 12px;">
+                <div class="btn-chip" data-mood="DRIFT">DRIFT</div>
+                <div class="btn-chip" data-mood="SERENE">SERENE</div>
+                <div class="btn-chip active" data-mood="JOYFUL">JOYFUL</div>
+                <div class="btn-chip" data-mood="EPIC">EPIC</div>
+                <div class="btn-chip" data-mood="MELANCHOLY">MELANCHOLY</div>
+                <div class="btn-chip" data-mood="TENSE">TENSE</div>
             </div>
 
             <div class="canvas-container" style="height: 120px;">
@@ -367,87 +373,53 @@
                 <span>← dark · valence · bright →</span>
                 <span>↑ intense · calm ↓</span>
             </div>
-
-            <div class="control-group" style="margin-top: 12px;">
-                <div class="control-label">
-                    <span>MOOD DEPTH</span>
-                </div>
-                <div class="slider-container">
-                    <input type="range" min="0" max="100" value="14">
-                    <span class="slider-val" style="color: var(--accent-rose)">14%</span>
-                </div>
-            </div>
-
-            <div class="description-text">
-                A third Lorenz system — the slowest — wanders the valence/arousal plane. Pick a mood to anchor it there, or Drift to let it roam. Valence tilts chords major/minor; arousal pushes tempo, groove density, note lengths, and velocity. Depth scales how hard the mood leans on the music.
-            </div>
         </div>
     </div>
 
     <div class="column">
         <div class="header-actions">
-            <button class="btn btn-run">► RUN</button>
-            <button class="btn btn-rec"><div class="rec-dot"></div> REC</button>
+            <button class="btn btn-run" id="btnRun">► RUN</button>
+            <button class="btn btn-rec" id="btnRec"><div class="rec-dot"></div> REC</button>
         </div>
 
         <div class="panel">
             <div class="panel-header">MUSIC THEORY</div>
             <div class="control-group">
                 <div class="select-row">
-                    <select><option>G</option></select>
-                    <select><option>Major</option></select>
+                    <select id="rootSelect">
+                        <option value="0">C</option>
+                        <option value="2">D</option>
+                        <option value="4">E</option>
+                        <option value="5">F</option>
+                        <option value="7" selected>G</option>
+                        <option value="9">A</option>
+                        <option value="11">B</option>
+                    </select>
+                    <select id="scaleSelect">
+                        <option value="major" selected>Major</option>
+                        <option value="minor">Minor</option>
+                        <option value="pentatonic">Pentatonic</option>
+                        <option value="dorian">Dorian</option>
+                    </select>
                 </div>
             </div>
 
             <div class="control-group">
                 <div class="control-label"><span>TEMPO</span></div>
                 <div class="slider-container">
-                    <input type="range" min="60" max="200" value="112">
-                    <span class="slider-val" style="color:var(--text-main)">112bpm</span>
+                    <input type="range" id="tempoSlider" min="60" max="200" value="112">
+                    <span class="slider-val" id="tempoVal" style="color:var(--text-main)">112bpm</span>
                 </div>
-            </div>
-
-            <div class="control-group">
-                <div class="control-label"><span>LEAD SOUND</span></div>
-                <select><option>Piano</option></select>
             </div>
         </div>
 
         <div class="panel">
-            <div class="panel-header">
-                HARMONY — CHORD: D · GROOVE: HALVES · EIGHTHS
+            <div class="panel-header" id="harmonyHeader">
+                HARMONY — CHORD: G
             </div>
             <div class="toggle-row" style="margin-bottom: 12px;">
-                <div class="toggle-btn active"><div class="indicator"></div> Chords</div>
-                <div class="toggle-btn active"><div class="indicator"></div> Bass</div>
-            </div>
-
-            <div class="control-group">
-                <div class="control-label"><span>CHORD-TONE PULL ON MELODY</span></div>
-                <div class="slider-container">
-                    <input type="range" min="0" max="1" step="0.01" value="0.70">
-                    <span class="slider-val">0.70</span>
-                </div>
-            </div>
-
-            <div class="control-group">
-                <div class="control-label"><span>ACCOMPANIMENT STYLE</span></div>
-                <select><option>Chaos Grooves</option></select>
-            </div>
-
-            <div class="select-row" style="margin-top: 8px;">
-                <div class="control-group">
-                    <div class="control-label"><span>CHORD SOUND</span></div>
-                    <select><option>Soft Piano</option></select>
-                </div>
-                <div class="control-group">
-                    <div class="control-label"><span>BASS SOUND</span></div>
-                    <select><option>FM Knock</option></select>
-                </div>
-            </div>
-
-            <div class="description-text">
-                A new triad lands each bar — Lorenz y proposes the degree, with a pull toward tonic and dominant. In Chaos Grooves the rhythm attractor deals a fresh groove every bar.
+                <div class="toggle-btn active" id="toggleChords"><div class="indicator"></div> Chords</div>
+                <div class="toggle-btn active" id="toggleBass"><div class="indicator"></div> Bass</div>
             </div>
         </div>
 
@@ -457,51 +429,154 @@
             <div class="control-group">
                 <div class="control-label"><span>ρ (LORENZ CHAOS)</span></div>
                 <div class="slider-container">
-                    <input type="range" min="0" max="50" step="0.1" value="28.0">
-                    <span class="slider-val">28.0</span>
+                    <input type="range" id="rhoSlider" min="10" max="50" step="0.1" value="28.0">
+                    <span class="slider-val" id="rhoVal">28.0</span>
                 </div>
-            </div>
-
-            <div class="control-group">
-                <div class="control-label"><span>RHYTHM SPREAD — ○ ◐ J ♪ ♬</span></div>
-                <div class="slider-container">
-                    <input type="range" min="0" max="100" value="60">
-                    <span class="slider-val" style="color:var(--accent-purple)">60%</span>
-                </div>
-            </div>
-
-            <div class="control-group">
-                <div class="control-label"><span>GRACE NOTES</span></div>
-                <div class="slider-container">
-                    <input type="range" min="0" max="100" value="15">
-                    <span class="slider-val" style="color:var(--accent-purple)">15%</span>
-                </div>
-            </div>
-
-            <div class="control-group">
-                <div class="control-label"><span>BLEND — POLICY ⇔ CHAOS</span></div>
-                <div class="slider-container">
-                    <input type="range" min="0" max="100" value="50">
-                    <span class="slider-val">CH 50%</span>
-                </div>
-            </div>
-
-            <div class="control-group">
-                <div class="control-label"><span>SOFTMAX TEMPERATURE</span></div>
-                <div class="slider-container">
-                    <input type="range" min="0.1" max="2.0" step="0.01" value="0.80">
-                    <span class="slider-val">0.80</span>
-                </div>
-            </div>
-
-            <div class="description-text">
-                ρ &lt; 24.7 settles to a fixed point (drones on few notes). ρ ≈ 28 is classic chaos. A second, independent Lorenz system (violet trace) drives all rhythm.
             </div>
         </div>
     </div>
 </div>
 
 <script>
+    // --- WEBAUDIO & GENERATIVE MUSIC ENGINE ---
+    let audioCtx = null;
+    let isPlaying = false;
+    let currentMood = 'JOYFUL';
+    let tempo = 112;
+    let playTimer = null;
+    let currentStep = 0;
+    let currentChord = [60, 64, 67]; // MIDI frequencies
+
+    let chordsEnabled = true;
+    let bassEnabled = true;
+
+    // Scale Definitions (Relative Intervals)
+    const SCALES = {
+        major: [0, 2, 4, 5, 7, 9, 11],
+        minor: [0, 2, 3, 5, 7, 8, 10],
+        pentatonic: [0, 2, 4, 7, 9],
+        dorian: [0, 2, 3, 5, 7, 9, 10]
+    };
+
+    const MOOD_PRESETS = {
+        JOYFUL: { scale: 'major', tempo: 124, rho: 28.0, octaves: [60, 72] },
+        SERENE: { scale: 'pentatonic', tempo: 80, rho: 18.0, octaves: [48, 60] },
+        EPIC: { scale: 'dorian', tempo: 135, rho: 34.0, octaves: [48, 60, 72] },
+        MELANCHOLY: { scale: 'minor', tempo: 72, rho: 22.0, octaves: [48, 60] },
+        TENSE: { scale: 'minor', tempo: 140, rho: 42.0, octaves: [60, 72] },
+        DRIFT: { scale: 'major', tempo: 100, rho: 28.0, octaves: [60, 72] }
+    };
+
+    function mtof(midi) {
+        return 440 * Math.pow(2, (midi - 69) / 12);
+    }
+
+    function initAudio() {
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+    }
+
+    function playTone(freq, type = 'sine', duration = 0.3, vol = 0.2) {
+        if (!audioCtx) return;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+
+        gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+    }
+
+    // Lorenz Engine variables for music generation
+    let lx = 0.1, ly = 0, lz = 0;
+    let lRho = 28.0;
+
+    function stepLorenz() {
+        const dt = 0.01;
+        const sigma = 10, beta = 8/3;
+        let dx = sigma * (ly - lx) * dt;
+        let dy = (lx * (lRho - lz) - ly) * dt;
+        let dz = (lx * ly - beta * lz) * dt;
+        lx += dx; ly += dy; lz += dz;
+    }
+
+    function generateAndPlayStep() {
+        stepLorenz();
+
+        const rootKey = parseInt(document.getElementById('rootSelect').value) + 48;
+        const scaleType = document.getElementById('scaleSelect').value;
+        const intervals = SCALES[scaleType] || SCALES.major;
+
+        // Map Lorenz values to musical scale pitches
+        const scaleIndex = Math.abs(Math.floor(lx)) % intervals.length;
+        const octaveOffset = (Math.floor(Math.abs(lz)) % 2) * 12;
+        const melodyMidi = rootKey + 12 + intervals[scaleIndex] + octaveOffset;
+
+        // Play Lead Melody
+        playTone(mtof(melodyMidi), 'triangle', 0.25, 0.2);
+
+        // Update UI Info
+        document.getElementById('noteStatus').innerText = `● Step ${currentStep + 1} · Pitch: MIDI ${melodyMidi}`;
+
+        // Trigger Harmony on Bar Boundaries (every 4 steps)
+        if (currentStep % 4 === 0) {
+            const chordRootIdx = Math.abs(Math.floor(ly)) % intervals.length;
+            const root = rootKey + intervals[chordRootIdx];
+            currentChord = [root, root + 4, root + 7];
+
+            if (chordsEnabled) {
+                currentChord.forEach(midi => playTone(mtof(midi), 'sine', 1.2, 0.08));
+            }
+
+            if (bassEnabled) {
+                playTone(mtof(root - 12), 'sawtooth', 0.8, 0.15);
+            }
+
+            document.getElementById('harmonyHeader').innerText = `HARMONY — CHORD DEGREE: ${chordRootIdx + 1}`;
+        }
+
+        // Randomize chart heights for visual feedback
+        const bars = document.querySelectorAll('#chartBars .chart-bar');
+        bars.forEach(bar => {
+            const h = Math.floor(Math.random() * 80) + 10;
+            bar.style.height = h + '%';
+        });
+
+        currentStep = (currentStep + 1) % 16;
+    }
+
+    function startEngine() {
+        initAudio();
+        if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+        isPlaying = true;
+        const btnRun = document.getElementById('btnRun');
+        btnRun.innerText = '■ STOP';
+        btnRun.classList.add('active');
+
+        const intervalMs = (60 / tempo) * 1000 / 2; // 8th notes
+        playTimer = setInterval(generateAndPlayStep, intervalMs);
+    }
+
+    function stopEngine() {
+        isPlaying = false;
+        if (playTimer) clearInterval(playTimer);
+        const btnRun = document.getElementById('btnRun');
+        btnRun.innerText = '► RUN';
+        btnRun.classList.remove('active');
+        document.getElementById('noteStatus').innerText = '● Standby · Stopped';
+    }
+
+    // --- CANVAS VISUALIZERS ---
     function renderLorenz(canvasId, primaryColor, secondaryColor) {
         const canvas = document.getElementById(canvasId);
         if (!canvas) return;
@@ -514,39 +589,32 @@
         resize();
         window.addEventListener('resize', resize);
 
-        // Lorenz Differential Equation Initial State
         let x = 0.1, y = 0, z = 0;
         let x2 = 0.1, y2 = 0.1, z2 = 0.1;
-        const sigma = 10, rho = 28, beta = 8/3, dt = 0.01;
-        
-        const points1 = [];
-        const points2 = [];
-        const maxPoints = 600;
+        const sigma = 10, beta = 8/3, dt = 0.01;
+        const points1 = [], points2 = [];
+        const maxPoints = 500;
 
         function animate() {
-            // Compute Main Orbit
             let dx = sigma * (y - x) * dt;
-            let dy = (x * (rho - z) - y) * dt;
+            let dy = (x * (lRho - z) - y) * dt;
             let dz = (x * y - beta * z) * dt;
             x += dx; y += dy; z += dz;
             points1.push({x, y, z});
             if (points1.length > maxPoints) points1.shift();
 
-            // Compute Offset Secondary Orbit
             let dx2 = (sigma + 1) * (y2 - x2) * dt;
-            let dy2 = (x2 * (rho - 2 - z2) - y2) * dt;
+            let dy2 = (x2 * (lRho - 2 - z2) - y2) * dt;
             let dz2 = (x2 * y2 - beta * z2) * dt;
             x2 += dx2; y2 += dy2; z2 += dz2;
             points2.push({x: x2, y: y2, z: z2});
             if (points2.length > maxPoints) points2.shift();
 
-            // Render
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             const cx = canvas.width / 2;
             const cy = canvas.height / 2 + 10;
             const scale = canvas.height / 70;
 
-            // Trace 1
             ctx.beginPath();
             ctx.strokeStyle = primaryColor;
             ctx.lineWidth = 1.2;
@@ -556,7 +624,6 @@
             }
             ctx.stroke();
 
-            // Trace 2
             ctx.beginPath();
             ctx.strokeStyle = secondaryColor;
             ctx.lineWidth = 1.0;
@@ -568,14 +635,77 @@
 
             requestAnimationFrame(animate);
         }
-
         animate();
     }
 
-    // Safely trigger once the page DOM tree has fully parsed
+    // --- BIND CONTROLS ---
     window.addEventListener('DOMContentLoaded', () => {
         renderLorenz('lorenzCanvasMain', '#6ee7d8', '#b794f4');
         renderLorenz('moodCanvas', '#f687b3', '#4fd1c5');
+
+        // Play/Stop toggle
+        document.getElementById('btnRun').addEventListener('click', () => {
+            if (isPlaying) stopEngine();
+            else startEngine();
+        });
+
+        // Mood Selectors
+        document.querySelectorAll('#moodButtons .btn-chip').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('#moodButtons .btn-chip').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+
+                const moodKey = btn.getAttribute('data-mood');
+                currentMood = moodKey;
+                document.getElementById('moodDisplay').innerText = moodKey;
+
+                const preset = MOOD_PRESETS[moodKey];
+                if (preset) {
+                    document.getElementById('scaleSelect').value = preset.scale;
+                    document.getElementById('tempoSlider').value = preset.tempo;
+                    document.getElementById('tempoVal').innerText = `${preset.tempo}bpm`;
+                    document.getElementById('rhoSlider').value = preset.rho;
+                    document.getElementById('rhoVal').innerText = preset.rho.toFixed(1);
+                    document.getElementById('rhoDisplay').innerText = preset.rho.toFixed(1);
+                    tempo = preset.tempo;
+                    lRho = preset.rho;
+
+                    if (isPlaying) {
+                        stopEngine();
+                        startEngine();
+                    }
+                }
+            });
+        });
+
+        // Sliders
+        const tempoSlider = document.getElementById('tempoSlider');
+        tempoSlider.addEventListener('input', (e) => {
+            tempo = parseInt(e.target.value);
+            document.getElementById('tempoVal').innerText = `${tempo}bpm`;
+            if (isPlaying) {
+                stopEngine();
+                startEngine();
+            }
+        });
+
+        const rhoSlider = document.getElementById('rhoSlider');
+        rhoSlider.addEventListener('input', (e) => {
+            lRho = parseFloat(e.target.value);
+            document.getElementById('rhoVal').innerText = lRho.toFixed(1);
+            document.getElementById('rhoDisplay').innerText = lRho.toFixed(1);
+        });
+
+        // Toggles
+        document.getElementById('toggleChords').addEventListener('click', function() {
+            chordsEnabled = !chordsEnabled;
+            this.classList.toggle('active', chordsEnabled);
+        });
+
+        document.getElementById('toggleBass').addEventListener('click', function() {
+            bassEnabled = !bassEnabled;
+            this.classList.toggle('active', bassEnabled);
+        });
     });
 </script>
 

@@ -2,20 +2,20 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Generative Lorenz Music Engine</title>
     <style>
         :root {
-            --bg-color: #121614;
-            --panel-bg: #1a201c;
-            --panel-border: #28332c;
-            --text-main: #9eb1a4;
-            --text-dim: #5c7063;
-            --accent-cyan: #6ee7d8;
-            --accent-amber: #f6ad55;
-            --accent-rose: #f687b3;
-            --accent-purple: #b794f4;
-            --input-bg: #222a25;
+            --bg-color: #f4f6f8;
+            --panel-bg: #ffffff;
+            --panel-border: #e1e6eb;
+            --text-main: #2d3748;
+            --text-dim: #718096;
+            --accent-cyan: #0d9488;
+            --accent-amber: #dd6b20;
+            --accent-rose: #e53e3e;
+            --accent-purple: #6b46c1;
+            --input-bg: #edf2f7;
             --font-mono: 'Fira Code', 'Courier New', Courier, monospace;
         }
 
@@ -25,6 +25,7 @@
             padding: 0;
             font-family: var(--font-mono);
             user-select: none;
+            touch-action: manipulation; /* Prevents double-tap zooming */
         }
 
         body {
@@ -42,7 +43,7 @@
             grid-template-columns: 1.2fr 1fr;
             gap: 16px;
             width: 100%;
-            max-width: 1200px;
+            max-width: 1100px;
         }
 
         @media (max-width: 850px) {
@@ -60,9 +61,9 @@
         .panel {
             background-color: var(--panel-bg);
             border: 1px solid var(--panel-border);
-            border-radius: 6px;
-            padding: 16px;
-            position: relative;
+            border-radius: 8px;
+            padding: 18px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
         }
 
         .panel-header {
@@ -71,6 +72,7 @@
             letter-spacing: 1px;
             color: var(--text-dim);
             margin-bottom: 12px;
+            font-weight: bold;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -91,7 +93,7 @@
             font-weight: bold;
             font-size: 13px;
             letter-spacing: 2px;
-            border-radius: 4px;
+            border-radius: 6px;
             cursor: pointer;
             display: flex;
             align-items: center;
@@ -102,20 +104,17 @@
 
         .btn-run {
             background-color: var(--accent-cyan);
-            color: #0d1e1a;
+            color: #ffffff;
             border: none;
         }
 
         .btn-run.active {
             background-color: var(--accent-amber);
-            color: #0d1e1a;
         }
-
-        .btn-run:hover { opacity: 0.9; }
 
         .btn-rec {
             color: var(--accent-rose);
-            border-color: rgba(246, 135, 179, 0.3);
+            border-color: rgba(229, 62, 62, 0.3);
         }
 
         .rec-dot {
@@ -123,31 +122,6 @@
             height: 8px;
             background-color: var(--accent-rose);
             border-radius: 50%;
-        }
-
-        /* Canvas Displays */
-        .canvas-container {
-            width: 100%;
-            height: 280px;
-            position: relative;
-            background-color: #151a17;
-            border-radius: 4px;
-            overflow: hidden;
-            border: 1px solid var(--panel-border);
-        }
-
-        canvas {
-            width: 100%;
-            height: 100%;
-            display: block;
-        }
-
-        .canvas-footer {
-            display: flex;
-            justify-content: space-between;
-            font-size: 11px;
-            margin-top: 8px;
-            color: var(--text-dim);
         }
 
         /* Form Controls */
@@ -180,7 +154,7 @@
             border: 1px solid var(--panel-border);
             color: var(--text-main);
             padding: 8px 12px;
-            border-radius: 4px;
+            border-radius: 6px;
             outline: none;
             font-family: inherit;
             cursor: pointer;
@@ -196,20 +170,20 @@
         input[type="range"] {
             -webkit-appearance: none;
             width: 100%;
-            height: 4px;
+            height: 5px;
             background: var(--input-bg);
-            border-radius: 2px;
+            border-radius: 3px;
             outline: none;
         }
 
         input[type="range"]::-webkit-slider-thumb {
             -webkit-appearance: none;
-            width: 14px;
-            height: 14px;
+            width: 16px;
+            height: 16px;
             border-radius: 50%;
-            background: #e2e8f0;
+            background: var(--accent-cyan);
             cursor: pointer;
-            box-shadow: 0 0 8px rgba(0,0,0,0.5);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.15);
         }
 
         .slider-val {
@@ -217,6 +191,7 @@
             min-width: 45px;
             text-align: right;
             color: var(--accent-amber);
+            font-weight: bold;
         }
 
         /* Probability Bar Visualizer */
@@ -232,7 +207,7 @@
         .chart-bar {
             flex: 1;
             background-color: var(--input-bg);
-            border-radius: 2px 2px 0 0;
+            border-radius: 3px 3px 0 0;
             transition: height 0.1s ease;
         }
 
@@ -241,7 +216,7 @@
         }
 
         .chart-bar.active-secondary {
-            background-color: #4fd1c5;
+            background-color: var(--accent-cyan);
         }
 
         /* Buttons Grid */
@@ -255,17 +230,19 @@
             background-color: var(--input-bg);
             border: 1px solid var(--panel-border);
             color: var(--text-dim);
-            padding: 6px 12px;
-            font-size: 10px;
-            border-radius: 4px;
+            padding: 8px 12px;
+            font-size: 11px;
+            border-radius: 6px;
             cursor: pointer;
             text-transform: uppercase;
+            font-weight: 500;
         }
 
         .btn-chip.active {
-            border-color: var(--accent-rose);
-            color: var(--accent-rose);
-            background-color: rgba(246, 135, 179, 0.05);
+            border-color: var(--accent-purple);
+            color: var(--accent-purple);
+            background-color: rgba(107, 70, 193, 0.08);
+            font-weight: bold;
         }
 
         /* Toggle Buttons */
@@ -279,9 +256,9 @@
             background-color: var(--input-bg);
             border: 1px solid var(--panel-border);
             color: var(--text-dim);
-            padding: 8px;
+            padding: 10px;
             font-size: 11px;
-            border-radius: 4px;
+            border-radius: 6px;
             text-align: center;
             cursor: pointer;
             display: flex;
@@ -293,6 +270,7 @@
         .toggle-btn.active {
             border-color: var(--accent-cyan);
             color: var(--accent-cyan);
+            font-weight: bold;
         }
 
         .indicator {
@@ -303,18 +281,22 @@
         }
 
         .description-text {
-            font-size: 10px;
+            font-size: 11px;
             line-height: 1.5;
             color: var(--text-dim);
             margin-top: 10px;
         }
 
-        .axis-labels {
+        .status-box {
+            padding: 12px;
+            background: var(--input-bg);
+            border-radius: 6px;
+            font-size: 12px;
+            color: var(--accent-cyan);
+            font-weight: bold;
+            margin-bottom: 12px;
             display: flex;
             justify-content: space-between;
-            font-size: 9px;
-            color: var(--text-dim);
-            margin-top: 4px;
         }
     </style>
 </head>
@@ -323,55 +305,50 @@
 <div class="dashboard">
     <div class="column">
         <div class="panel">
-            <div class="canvas-container">
-                <canvas id="lorenzCanvasMain"></canvas>
-            </div>
-            <div class="canvas-footer">
-                <div><span style="color:var(--accent-cyan)">CH·A pitch ρ=<span id="rhoDisplay">28.0</span></span> · <span style="color:var(--accent-purple)">CH·R rhythm</span></div>
-                <div style="color:var(--accent-amber)" id="noteStatus">● Standby · Press RUN</div>
-            </div>
-        </div>
-
-        <div class="panel">
-            <div class="panel-header">
-                P(NEXT NOTE) — SOFTMAX OVER BLENDED LOGITS
-            </div>
-            <div class="chart-container" id="chartBars">
-                <div class="chart-bar" style="height: 10%;"></div>
-                <div class="chart-bar" style="height: 20%;"></div>
-                <div class="chart-bar active-secondary" style="height: 40%;"></div>
-                <div class="chart-bar active-primary" style="height: 85%;"></div>
-                <div class="chart-bar active-secondary" style="height: 55%;"></div>
-                <div class="chart-bar" style="height: 18%;"></div>
-                <div class="chart-bar" style="height: 13%;"></div>
-                <div class="chart-bar" style="height: 22%;"></div>
-                <div class="chart-bar" style="height: 15%;"></div>
-                <div class="chart-bar" style="height: 5%;"></div>
+            <div class="panel-header">GENERATOR ENGINE STATUS</div>
+            <div class="status-box">
+                <span id="noteStatus">● Standby · Press RUN</span>
+                <span style="color: var(--accent-purple)">ρ=<span id="rhoDisplay">28.0</span></span>
             </div>
             <div class="description-text">
-                Real-time pitch probabilities dynamically generated from Lorenz chaos mapping.
+                Real-time algorithmic music generator driven by chaotic Lorenz mapping equations and scale voice leading.
             </div>
         </div>
 
         <div class="panel">
             <div class="panel-header">
-                EMOTION — FEELING: <span style="color: var(--accent-rose)" id="moodDisplay">JOYFUL</span>
+                GENRE PRESETS — ACTIVE: <span style="color: var(--accent-purple)" id="genreDisplay">JAZZ</span>
             </div>
-            <div class="btn-group" id="moodButtons" style="margin-bottom: 12px;">
-                <div class="btn-chip" data-mood="DRIFT">DRIFT</div>
-                <div class="btn-chip" data-mood="SERENE">SERENE</div>
-                <div class="btn-chip active" data-mood="JOYFUL">JOYFUL</div>
-                <div class="btn-chip" data-mood="EPIC">EPIC</div>
-                <div class="btn-chip" data-mood="MELANCHOLY">MELANCHOLY</div>
-                <div class="btn-chip" data-mood="TENSE">TENSE</div>
+            <div class="btn-group" id="genreButtons">
+                <div class="btn-chip active" data-genre="JAZZ">JAZZ</div>
+                <div class="btn-chip" data-genre="LOFI">LO-FI</div>
+                <div class="btn-chip" data-genre="SYNTHWAVE">SYNTHWAVE</div>
+                <div class="btn-chip" data-genre="CLASSICAL">CLASSICAL</div>
+                <div class="btn-chip" data-genre="AMBIENT">AMBIENT</div>
+                <div class="btn-chip" data-genre="FUNK">FUNK</div>
+                <div class="btn-chip" data-genre="ROCK">ROCK</div>
+                <div class="btn-chip" data-genre="BLUES">BLUES</div>
+                <div class="btn-chip" data-genre="POP">POP</div>
+                <div class="btn-chip" data-genre="EDM">EDM</div>
             </div>
+            <div class="description-text">
+                Selecting a genre recalibrates scales, chord extensions, tempo, and rhythm syncopation algorithms.
+            </div>
+        </div>
 
-            <div class="canvas-container" style="height: 120px;">
-                <canvas id="moodCanvas"></canvas>
-            </div>
-            <div class="axis-labels">
-                <span>← dark · valence · bright →</span>
-                <span>↑ intense · calm ↓</span>
+        <div class="panel">
+            <div class="panel-header">P(PITCH DENSITY) — SOFTMAX PROBABILITIES</div>
+            <div class="chart-container" id="chartBars">
+                <div class="chart-bar" style="height: 15%;"></div>
+                <div class="chart-bar" style="height: 25%;"></div>
+                <div class="chart-bar active-secondary" style="height: 45%;"></div>
+                <div class="chart-bar active-primary" style="height: 85%;"></div>
+                <div class="chart-bar active-secondary" style="height: 60%;"></div>
+                <div class="chart-bar" style="height: 30%;"></div>
+                <div class="chart-bar" style="height: 20%;"></div>
+                <div class="chart-bar" style="height: 40%;"></div>
+                <div class="chart-bar" style="height: 25%;"></div>
+                <div class="chart-bar" style="height: 10%;"></div>
             </div>
         </div>
     </div>
@@ -383,7 +360,7 @@
         </div>
 
         <div class="panel">
-            <div class="panel-header">MUSIC THEORY</div>
+            <div class="panel-header">MUSIC THEORY & SCALES</div>
             <div class="control-group">
                 <div class="select-row">
                     <select id="rootSelect">
@@ -396,10 +373,11 @@
                         <option value="11">B</option>
                     </select>
                     <select id="scaleSelect">
-                        <option value="major" selected>Major</option>
+                        <option value="major">Major</option>
                         <option value="minor">Minor</option>
                         <option value="pentatonic">Pentatonic</option>
-                        <option value="dorian">Dorian</option>
+                        <option value="dorian" selected>Dorian</option>
+                        <option value="blues">Blues Scale</option>
                     </select>
                 </div>
             </div>
@@ -407,15 +385,15 @@
             <div class="control-group">
                 <div class="control-label"><span>TEMPO</span></div>
                 <div class="slider-container">
-                    <input type="range" id="tempoSlider" min="60" max="200" value="112">
-                    <span class="slider-val" id="tempoVal" style="color:var(--text-main)">112bpm</span>
+                    <input type="range" id="tempoSlider" min="50" max="180" value="110">
+                    <span class="slider-val" id="tempoVal" style="color:var(--text-main)">110bpm</span>
                 </div>
             </div>
         </div>
 
         <div class="panel">
             <div class="panel-header" id="harmonyHeader">
-                HARMONY — CHORD: G
+                HARMONY — CHORD DEGREE: Imaj7
             </div>
             <div class="toggle-row" style="margin-bottom: 12px;">
                 <div class="toggle-btn active" id="toggleChords"><div class="indicator"></div> Chords</div>
@@ -424,10 +402,9 @@
         </div>
 
         <div class="panel">
-            <div class="panel-header">CHAOS ⇔ LEARNING</div>
-            
+            <div class="panel-header">CHAOS DYNAMICS</div>
             <div class="control-group">
-                <div class="control-label"><span>ρ (LORENZ CHAOS)</span></div>
+                <div class="control-label"><span>ρ (LORENZ CHAOS PARAMETER)</span></div>
                 <div class="slider-container">
                     <input type="range" id="rhoSlider" min="10" max="50" step="0.1" value="28.0">
                     <span class="slider-val" id="rhoVal">28.0</span>
@@ -438,33 +415,38 @@
 </div>
 
 <script>
-    // --- WEBAUDIO & GENERATIVE MUSIC ENGINE ---
+    // --- WEBAUDIO & ADVANCED GENERATIVE ENGINE ---
     let audioCtx = null;
     let isPlaying = false;
-    let currentMood = 'JOYFUL';
-    let tempo = 112;
+    let currentGenre = 'JAZZ';
+    let tempo = 110;
     let playTimer = null;
     let currentStep = 0;
-    let currentChord = [60, 64, 67]; // MIDI frequencies
-
+    
     let chordsEnabled = true;
     let bassEnabled = true;
 
-    // Scale Definitions (Relative Intervals)
+    // Scale Definitions
     const SCALES = {
         major: [0, 2, 4, 5, 7, 9, 11],
         minor: [0, 2, 3, 5, 7, 8, 10],
         pentatonic: [0, 2, 4, 7, 9],
-        dorian: [0, 2, 3, 5, 7, 9, 10]
+        dorian: [0, 2, 3, 5, 7, 9, 10],
+        blues: [0, 3, 5, 6, 7, 10]
     };
 
-    const MOOD_PRESETS = {
-        JOYFUL: { scale: 'major', tempo: 124, rho: 28.0, octaves: [60, 72] },
-        SERENE: { scale: 'pentatonic', tempo: 80, rho: 18.0, octaves: [48, 60] },
-        EPIC: { scale: 'dorian', tempo: 135, rho: 34.0, octaves: [48, 60, 72] },
-        MELANCHOLY: { scale: 'minor', tempo: 72, rho: 22.0, octaves: [48, 60] },
-        TENSE: { scale: 'minor', tempo: 140, rho: 42.0, octaves: [60, 72] },
-        DRIFT: { scale: 'major', tempo: 100, rho: 28.0, octaves: [60, 72] }
+    // Genre Presets Configuration
+    const GENRE_PRESETS = {
+        JAZZ: { scale: 'dorian', tempo: 110, rho: 28.0, synthLead: 'triangle', chordType: '7th9th' },
+        LOFI: { scale: 'major', tempo: 75, rho: 18.0, synthLead: 'sine', chordType: '7th' },
+        SYNTHWAVE: { scale: 'minor', tempo: 124, rho: 32.0, synthLead: 'sawtooth', chordType: 'triad' },
+        CLASSICAL: { scale: 'major', tempo: 90, rho: 22.0, synthLead: 'triangle', chordType: 'triad' },
+        AMBIENT: { scale: 'pentatonic', tempo: 60, rho: 14.0, synthLead: 'sine', chordType: '7th9th' },
+        FUNK: { scale: 'dorian', tempo: 115, rho: 35.0, synthLead: 'square', chordType: '7th' },
+        ROCK: { scale: 'minor', tempo: 130, rho: 38.0, synthLead: 'sawtooth', chordType: 'power' },
+        BLUES: { scale: 'blues', tempo: 95, rho: 26.0, synthLead: 'square', chordType: '7th' },
+        POP: { scale: 'major', tempo: 120, rho: 24.0, synthLead: 'triangle', chordType: 'triad' },
+        EDM: { scale: 'minor', tempo: 128, rho: 40.0, synthLead: 'sawtooth', chordType: 'triad' }
     };
 
     function mtof(midi) {
@@ -477,7 +459,7 @@
         }
     }
 
-    function playTone(freq, type = 'sine', duration = 0.3, vol = 0.2) {
+    function playTone(freq, type = 'sine', duration = 0.3, vol = 0.15, attack = 0.01) {
         if (!audioCtx) return;
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
@@ -485,7 +467,8 @@
         osc.type = type;
         osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
 
-        gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0, audioCtx.currentTime);
+        gain.gain.linearRampToValueAtTime(vol, audioCtx.currentTime + attack);
         gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
 
         osc.connect(gain);
@@ -495,7 +478,7 @@
         osc.stop(audioCtx.currentTime + duration);
     }
 
-    // Lorenz Engine variables for music generation
+    // Lorenz Attractor Variables
     let lx = 0.1, ly = 0, lz = 0;
     let lRho = 28.0;
 
@@ -508,46 +491,77 @@
         lx += dx; ly += dy; lz += dz;
     }
 
+    let lastMelodyNote = 67;
+
     function generateAndPlayStep() {
         stepLorenz();
 
         const rootKey = parseInt(document.getElementById('rootSelect').value) + 48;
         const scaleType = document.getElementById('scaleSelect').value;
         const intervals = SCALES[scaleType] || SCALES.major;
+        const genreConfig = GENRE_PRESETS[currentGenre];
 
-        // Map Lorenz values to musical scale pitches
-        const scaleIndex = Math.abs(Math.floor(lx)) % intervals.length;
-        const octaveOffset = (Math.floor(Math.abs(lz)) % 2) * 12;
-        const melodyMidi = rootKey + 12 + intervals[scaleIndex] + octaveOffset;
+        // --- 1. MELODY GENERATION (Smooth Voice-Leading Walks) ---
+        const stepMove = Math.round(lx) % 3; // Step up/down/hold
+        let newNoteIdx = intervals.indexOf((lastMelodyNote - rootKey) % 12);
+        if (newNoteIdx === -1) newNoteIdx = 0;
 
-        // Play Lead Melody
-        playTone(mtof(melodyMidi), 'triangle', 0.25, 0.2);
+        newNoteIdx = (newNoteIdx + stepMove + intervals.length) % intervals.length;
+        const octave = 12 * (Math.floor(Math.abs(lz) % 2) + 1); // 1 or 2 octaves up
+        const melodyMidi = rootKey + octave + intervals[newNoteIdx];
+        lastMelodyNote = melodyMidi;
 
-        // Update UI Info
-        document.getElementById('noteStatus').innerText = `● Step ${currentStep + 1} · Pitch: MIDI ${melodyMidi}`;
+        // Play Melody Lead Note
+        playTone(mtof(melodyMidi), genreConfig.synthLead, 0.3, 0.15, 0.02);
 
-        // Trigger Harmony on Bar Boundaries (every 4 steps)
+        // --- 2. HARMONY & CHORDS GENERATION (Every 4 steps / Bar boundary) ---
         if (currentStep % 4 === 0) {
-            const chordRootIdx = Math.abs(Math.floor(ly)) % intervals.length;
-            const root = rootKey + intervals[chordRootIdx];
-            currentChord = [root, root + 4, root + 7];
+            const chordRootDegree = Math.abs(Math.floor(ly)) % intervals.length;
+            const chordRootMidi = rootKey + intervals[chordRootDegree];
+            let chordNotes = [];
+
+            // Advanced Harmony Types
+            if (genreConfig.chordType === '7th9th') {
+                chordNotes = [
+                    chordRootMidi, 
+                    chordRootMidi + 4, 
+                    chordRootMidi + 7, 
+                    chordRootMidi + 11, 
+                    chordRootMidi + 14
+                ];
+            } else if (genreConfig.chordType === '7th') {
+                chordNotes = [chordRootMidi, chordRootMidi + 4, chordRootMidi + 7, chordRootMidi + 10];
+            } else if (genreConfig.chordType === 'power') {
+                chordNotes = [chordRootMidi, chordRootMidi + 7, chordRootMidi + 12];
+            } else {
+                chordNotes = [chordRootMidi, chordRootMidi + 4, chordRootMidi + 7]; // Basic Triad
+            }
 
             if (chordsEnabled) {
-                currentChord.forEach(midi => playTone(mtof(midi), 'sine', 1.2, 0.08));
+                chordNotes.forEach(midi => playTone(mtof(midi), 'sine', 1.4, 0.05, 0.08));
             }
 
             if (bassEnabled) {
-                playTone(mtof(root - 12), 'sawtooth', 0.8, 0.15);
+                // Rhythmic Bassline Pattern
+                playTone(mtof(chordRootMidi - 12), 'sawtooth', 0.6, 0.12, 0.01);
             }
 
-            document.getElementById('harmonyHeader').innerText = `HARMONY — CHORD DEGREE: ${chordRootIdx + 1}`;
+            document.getElementById('harmonyHeader').innerText = `HARMONY — CHORD DEGREE: ${chordRootDegree + 1}`;
         }
 
-        // Randomize chart heights for visual feedback
+        // Bass Off-beat Groove Syncopation for Funk/EDM
+        if ((currentGenre === 'FUNK' || currentGenre === 'EDM') && currentStep % 2 !== 0 && bassEnabled) {
+            const chordRootDegree = Math.abs(Math.floor(ly)) % intervals.length;
+            const chordRootMidi = rootKey + intervals[chordRootDegree];
+            playTone(mtof(chordRootMidi - 12), 'square', 0.2, 0.08, 0.01);
+        }
+
+        document.getElementById('noteStatus').innerText = `● Step ${currentStep + 1} · Melody MIDI ${melodyMidi}`;
+
+        // Randomize chart visual heights
         const bars = document.querySelectorAll('#chartBars .chart-bar');
         bars.forEach(bar => {
-            const h = Math.floor(Math.random() * 80) + 10;
-            bar.style.height = h + '%';
+            bar.style.height = (Math.floor(Math.random() * 80) + 10) + '%';
         });
 
         currentStep = (currentStep + 1) % 16;
@@ -563,7 +577,7 @@
         btnRun.innerText = '■ STOP';
         btnRun.classList.add('active');
 
-        const intervalMs = (60 / tempo) * 1000 / 2; // 8th notes
+        const intervalMs = (60 / tempo) * 1000 / 2; // 8th note resolution
         playTimer = setInterval(generateAndPlayStep, intervalMs);
     }
 
@@ -576,90 +590,25 @@
         document.getElementById('noteStatus').innerText = '● Standby · Stopped';
     }
 
-    // --- CANVAS VISUALIZERS ---
-    function renderLorenz(canvasId, primaryColor, secondaryColor) {
-        const canvas = document.getElementById(canvasId);
-        if (!canvas) return;
-        const ctx = canvas.getContext('2d');
-
-        function resize() {
-            canvas.width = canvas.parentElement.clientWidth || 300;
-            canvas.height = canvas.parentElement.clientHeight || 150;
-        }
-        resize();
-        window.addEventListener('resize', resize);
-
-        let x = 0.1, y = 0, z = 0;
-        let x2 = 0.1, y2 = 0.1, z2 = 0.1;
-        const sigma = 10, beta = 8/3, dt = 0.01;
-        const points1 = [], points2 = [];
-        const maxPoints = 500;
-
-        function animate() {
-            let dx = sigma * (y - x) * dt;
-            let dy = (x * (lRho - z) - y) * dt;
-            let dz = (x * y - beta * z) * dt;
-            x += dx; y += dy; z += dz;
-            points1.push({x, y, z});
-            if (points1.length > maxPoints) points1.shift();
-
-            let dx2 = (sigma + 1) * (y2 - x2) * dt;
-            let dy2 = (x2 * (lRho - 2 - z2) - y2) * dt;
-            let dz2 = (x2 * y2 - beta * z2) * dt;
-            x2 += dx2; y2 += dy2; z2 += dz2;
-            points2.push({x: x2, y: y2, z: z2});
-            if (points2.length > maxPoints) points2.shift();
-
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            const cx = canvas.width / 2;
-            const cy = canvas.height / 2 + 10;
-            const scale = canvas.height / 70;
-
-            ctx.beginPath();
-            ctx.strokeStyle = primaryColor;
-            ctx.lineWidth = 1.2;
-            for (let i = 0; i < points1.length - 1; i++) {
-                ctx.moveTo(cx + points1[i].x * scale * 1.8, cy - points1[i].z * scale);
-                ctx.lineTo(cx + points1[i+1].x * scale * 1.8, cy - points1[i+1].z * scale);
-            }
-            ctx.stroke();
-
-            ctx.beginPath();
-            ctx.strokeStyle = secondaryColor;
-            ctx.lineWidth = 1.0;
-            for (let i = 0; i < points2.length - 1; i++) {
-                ctx.moveTo(cx + points2[i].x * scale * 1.8, cy - points2[i].z * scale);
-                ctx.lineTo(cx + points2[i+1].x * scale * 1.8, cy - points2[i+1].z * scale);
-            }
-            ctx.stroke();
-
-            requestAnimationFrame(animate);
-        }
-        animate();
-    }
-
     // --- BIND CONTROLS ---
     window.addEventListener('DOMContentLoaded', () => {
-        renderLorenz('lorenzCanvasMain', '#6ee7d8', '#b794f4');
-        renderLorenz('moodCanvas', '#f687b3', '#4fd1c5');
-
         // Play/Stop toggle
         document.getElementById('btnRun').addEventListener('click', () => {
             if (isPlaying) stopEngine();
             else startEngine();
         });
 
-        // Mood Selectors
-        document.querySelectorAll('#moodButtons .btn-chip').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                document.querySelectorAll('#moodButtons .btn-chip').forEach(b => b.classList.remove('active'));
+        // Genre Selector Buttons
+        document.querySelectorAll('#genreButtons .btn-chip').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('#genreButtons .btn-chip').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
 
-                const moodKey = btn.getAttribute('data-mood');
-                currentMood = moodKey;
-                document.getElementById('moodDisplay').innerText = moodKey;
+                const genre = btn.getAttribute('data-genre');
+                currentGenre = genre;
+                document.getElementById('genreDisplay').innerText = genre;
 
-                const preset = MOOD_PRESETS[moodKey];
+                const preset = GENRE_PRESETS[genre];
                 if (preset) {
                     document.getElementById('scaleSelect').value = preset.scale;
                     document.getElementById('tempoSlider').value = preset.tempo;

@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Generative Music Engine & Sound Design</title>
-    <script src="https://cdn.jsdelivr.net/npm/midi-writer-js@2.1.4/build/index.min.js"></script>
     <style>
         :root {
             --bg-color: #f4f6f8;
@@ -26,7 +25,7 @@
             padding: 0;
             font-family: var(--font-mono);
             user-select: none;
-            touch-action: manipulation; /* Prevents double-tap zooming */
+            touch-action: manipulation;
         }
 
         body {
@@ -414,18 +413,10 @@
     let attackTime = 0.02;
     let releaseTime = 0.4;
 
-    // MIDI Recording Buffers
-    let recordedLeadNotes = [];
-    let recordedChordNotes = [];
-    let recordedBassNotes = [];
-
-    // Pitch Notation Conversion for MidiWriter
-    const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
-    function midiToPitchName(midi) {
-        const name = NOTE_NAMES[midi % 12];
-        const oct = Math.floor(midi / 12) - 1;
-        return name + oct;
-    }
+    // MIDI Recording Buffers (Raw MIDI pitch numbers)
+    let recordedLeadEvents = [];
+    let recordedChordEvents = [];
+    let recordedBassEvents = [];
 
     const SCALES = {
         major: [0, 2, 4, 5, 7, 9, 11],
@@ -519,7 +510,7 @@
         playSynthTone(mtof(melodyMidi), leadWave, 0.25, 0.18);
 
         if (isRecording) {
-            recordedLeadNotes.push(midiToPitchName(melodyMidi));
+            recordedLeadEvents.push({ pitch: melodyMidi, step: recordedLeadEvents.length });
         }
 
         // --- 2. HARMONY & CHORDS (Bar Boundaries) ---
@@ -541,7 +532,7 @@
             if (chordsEnabled) {
                 chordNotes.forEach(midi => playSynthTone(mtof(midi), 'sine', 1.2, 0.06));
                 if (isRecording) {
-                    recordedChordNotes.push(chordNotes.map(m => midiToPitchName(m)));
+                    recordedChordEvents.push({ pitches: chordNotes });
                 }
             }
 
@@ -549,7 +540,7 @@
                 const bassMidi = chordRootMidi - 12;
                 playSynthTone(mtof(bassMidi), 'sawtooth', 0.8, 0.14);
                 if (isRecording) {
-                    recordedBassNotes.push(midiToPitchName(bassMidi));
+                    recordedBassEvents.push({ pitch: bassMidi });
                 }
             }
         }
@@ -579,37 +570,79 @@
         btnRun.classList.remove('active');
     }
 
-    // Export Multitrack MIDI File using MidiWriterJS
+    // --- PURE JS MULTITRACK BINARY MIDI EXPORTER ---
+    function writeVarInt(val) {
+        let buffer = [];
+        let num = val;
+        buffer.push(num & 0x7f);
+        num >>= 7;
+        while (num > 0) {
+            buffer.unshift((num & 0x7f) | 0x80);
+            num >>= 7;
+        }
+        return buffer;
+    }
+
+    function buildTrackChunk(events) {
+        let bytes = [];
+        // Track Name / Header events
+        bytes.push(0x00, 0xFF, 0x2F, 0x00); // End of track default placeholder
+
+        let trackBytes = [];
+        events.forEach(evt => {
+            // Delta time 0, Note On
+            trackBytes.push(0x00, 0x90, evt.pitch, 0x64);
+            // Delta time 96 (8th note ticks), Note Off
+            trackBytes.push(...writeVarInt(96), 0x80, evt.pitch, 0x00);
+        });
+        trackBytes.push(0x00, 0xFF, 0x2F, 0x00); // End of Track
+
+        const len = trackBytes.length;
+        const header = [
+            0x4D, 0x54, 0x72, 0x6B, // "MTrk"
+            (len >> 24) & 0xFF,
+            (len >> 16) & 0xFF,
+            (len >> 8) & 0xFF,
+            len & 0xFF
+        ];
+
+        return new Uint8Array([...header, ...trackBytes]);
+    }
+
     function exportMultitrackMidi() {
-        if (typeof MidiWriter === 'undefined') {
-            alert('MIDI Exporter is loading, please try again in a moment.');
+        if (recordedLeadEvents.length === 0) {
+            alert("No MIDI notes recorded yet. Press RUN and REC MIDI to capture notes!");
             return;
         }
 
-        const leadTrack = new MidiWriter.Track();
-        leadTrack.setTempo(tempo);
-        leadTrack.addEvent(new MidiWriter.ProgramChangeEvent({instrument: 1}));
-        recordedLeadNotes.forEach(pitch => {
-            leadTrack.addEvent(new MidiWriter.NoteEvent({pitch: [pitch], duration: '8'}));
+        const leadTrack = buildTrackChunk(recordedLeadEvents);
+        const chordEventsFlat = [];
+        recordedChordEvents.forEach(ch => {
+            ch.pitches.forEach(p => chordEventsFlat.push({ pitch: p }));
         });
+        const chordTrack = buildTrackChunk(chordEventsFlat);
+        const bassTrack = buildTrackChunk(recordedBassEvents);
 
-        const chordTrack = new MidiWriter.Track();
-        chordTrack.setTempo(tempo);
-        chordTrack.addEvent(new MidiWriter.ProgramChangeEvent({instrument: 5}));
-        recordedChordNotes.forEach(pitches => {
-            chordTrack.addEvent(new MidiWriter.NoteEvent({pitch: pitches, duration: '2'}));
-        });
+        // Standard MIDI Header: Type 1 (Multitrack), 3 Tracks, 192 Ticks/Quarter Note
+        const headerChunk = new Uint8Array([
+            0x4D, 0x54, 0x68, 0x64, // "MThd"
+            0x00, 0x00, 0x00, 0x06, // Header length
+            0x00, 0x01,             // Format 1
+            0x00, 0x03,             // 3 Tracks
+            0x00, 0xC0              // 192 Ticks per quarter note
+        ]);
 
-        const bassTrack = new MidiWriter.Track();
-        bassTrack.setTempo(tempo);
-        bassTrack.addEvent(new MidiWriter.ProgramChangeEvent({instrument: 33}));
-        recordedBassNotes.forEach(pitch => {
-            bassTrack.addEvent(new MidiWriter.NoteEvent({pitch: [pitch], duration: '2'}));
-        });
+        const totalLength = headerChunk.length + leadTrack.length + chordTrack.length + bassTrack.length;
+        const midiBinary = new Uint8Array(totalLength);
+        
+        midiBinary.set(headerChunk, 0);
+        midiBinary.set(leadTrack, headerChunk.length);
+        midiBinary.set(chordTrack, headerChunk.length + leadTrack.length);
+        midiBinary.set(bassTrack, headerChunk.length + leadTrack.length + chordTrack.length);
 
-        const write = new MidiWriter.Writer([leadTrack, chordTrack, bassTrack]);
+        const blob = new Blob([midiBinary], { type: 'audio/midi' });
         const downloadLink = document.createElement('a');
-        downloadLink.href = write.dataUri();
+        downloadLink.href = URL.createObjectURL(blob);
         downloadLink.download = `Generative_${currentGenre}_Session.mid`;
         document.body.appendChild(downloadLink);
         downloadLink.click();
@@ -628,9 +661,9 @@
         btnRec.addEventListener('click', () => {
             if (!isRecording) {
                 isRecording = true;
-                recordedLeadNotes = [];
-                recordedChordNotes = [];
-                recordedBassNotes = [];
+                recordedLeadEvents = [];
+                recordedChordEvents = [];
+                recordedBassEvents = [];
                 btnRec.classList.add('recording');
                 btnRec.innerHTML = '<div class="rec-dot"></div> STOP & SAVE';
                 if (!isPlaying) startEngine();

@@ -148,6 +148,17 @@
                 </div>
 
                 <div class="control-group">
+                    <div class="control-label"><span>BARS TO GENERATE</span><span class="val-disp" id="barsProgress">BAR 1</span></div>
+                    <select id="barsSelect">
+                        <option value="0" selected>Continuous / Infinite</option>
+                        <option value="4">4 Bars</option>
+                        <option value="8">8 Bars</option>
+                        <option value="16">16 Bars</option>
+                        <option value="32">32 Bars</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
                     <div class="control-label"><span>TEMPO</span><span class="val-disp" id="tempoVal">124bpm</span></div>
                     <input type="range" id="tempoSlider" min="60" max="180" value="124">
                 </div>
@@ -167,7 +178,7 @@
                 </div>
 
                 <div class="info-card">
-                    Click <b>REC AUDIO (WAV)</b> to record live output directly to a WAV audio file, or click <b>EXPORT MIDI</b> to download a multitrack .mid file for your DAW.
+                    Select the number of bars to generate. The engine will automatically complete the performance and download your <b>.mid</b> file!
                 </div>
             </div>
         </div>
@@ -188,6 +199,7 @@
     let isPlaying = false;
     let playTimer = null;
     let gridStep = 0;
+    let totalStepsPlayed = 0;
 
     // Control Parameters
     let tempo = 124;
@@ -200,11 +212,10 @@
     let chordsEnabled = true;
     let bassEnabled = true;
 
-    // Recorded MIDI Event Log
-    let recordedMidiEvents = [];
-    let performanceStartTime = 0;
+    // Recorded MIDI Events Log
+    let recordedEvents = [];
+    let currentBarCount = 1;
 
-    // Scale Definitions
     const SCALES = {
         major: [0, 2, 4, 5, 7, 9, 11],
         minor: [0, 2, 3, 5, 7, 8, 10],
@@ -246,7 +257,7 @@
         }
     }
 
-    // REAL-TIME VOICE SYNTHESIZER WITH CLEAR TIMBRAL DIFFERENCES
+    // VOICE SYNTHESIZER
     function playTone(midiPitch, waveType, duration, volume, trackName = 'lead') {
         if (!audioCtx) return;
         const now = audioCtx.currentTime;
@@ -258,7 +269,6 @@
         osc.type = waveType;
         osc.frequency.setValueAtTime(mtof(midiPitch), now);
 
-        // Sound Design Low-Pass Filter Shaping per Waveform
         voiceFilter.type = 'lowpass';
         let targetCutoff = filterCutoff;
 
@@ -269,7 +279,6 @@
         voiceFilter.frequency.exponentialRampToValueAtTime(Math.min(11000, targetCutoff * 1.6), now + attackTime);
         voiceFilter.frequency.exponentialRampToValueAtTime(Math.max(180, targetCutoff * 0.3), now + duration + releaseTime);
 
-        // Amplitude ADSR Envelope
         voiceGain.gain.setValueAtTime(0.0001, now);
         voiceGain.gain.linearRampToValueAtTime(volume, now + attackTime);
         voiceGain.gain.exponentialRampToValueAtTime(Math.max(0.0001, volume * 0.35), now + attackTime + 0.1);
@@ -282,19 +291,18 @@
         osc.start(now);
         osc.stop(now + duration + releaseTime + 0.05);
 
-        // Log MIDI Event if Engine is active
+        // Record event for MIDI exporter
         if (isPlaying) {
-            const timeOffset = Date.now() - performanceStartTime;
-            recordedMidiEvents.push({
-                time: timeOffset,
+            recordedEvents.push({
+                step: totalStepsPlayed,
                 pitch: midiPitch,
-                duration: duration * 1000,
+                durationSteps: Math.max(1, Math.round(duration * 4)),
                 track: trackName
             });
         }
     }
 
-    // MELODY GENERATOR WITH COHESIVE PHRASING
+    // MELODY STEP CALCULATOR
     function calculateMelodyPitch(rootMidi, scale) {
         const scaleNotes = [];
         scale.forEach(step => scaleNotes.push(rootMidi + 12 + step));
@@ -314,7 +322,18 @@
 
     // TIMING TICK ENGINE
     function tick() {
-        const rootMidi = parseInt(document.getElementById('rootSelect').value) + 48; // G3 / C3
+        const targetBars = parseInt(document.getElementById('barsSelect').value);
+        currentBarCount = Math.floor(totalStepsPlayed / 16) + 1;
+
+        if (targetBars > 0 && currentBarCount > targetBars) {
+            stopEngine();
+            exportMidiFile(); // Auto-download MIDI upon bar completion
+            return;
+        }
+
+        document.getElementById('barsProgress').innerText = targetBars > 0 ? `BAR ${currentBarCount} / ${targetBars}` : `BAR ${currentBarCount}`;
+
+        const rootMidi = parseInt(document.getElementById('rootSelect').value) + 48;
         const scaleType = document.getElementById('scaleSelect').value;
         const scale = SCALES[scaleType] || SCALES.minor;
 
@@ -329,19 +348,19 @@
             rootMidi + scale[(degree + 4) % numScale]
         ];
 
-        // 1. Play Chords
+        // 1. Chords
         if (chordsEnabled && (stepInBar === 0 || stepInBar === 8)) {
             chordPitches.forEach((pitch, i) => {
                 setTimeout(() => playTone(pitch, 'triangle', 1.2, 0.08, 'chords'), i * 15);
             });
         }
 
-        // 2. Play Bass Line
+        // 2. Bass
         if (bassEnabled && (stepInBar % 8 === 0)) {
             playTone(chordPitches[0] - 12, 'sawtooth', 0.8, 0.18, 'bass');
         }
 
-        // 3. Play Lead Melody
+        // 3. Lead Line
         if (leadEnabled) {
             const isNoteStep = (stepInBar % 2 === 0);
             const isRestStep = (stepInBar === 6 || stepInBar === 14) && (Math.random() > 0.4);
@@ -354,13 +373,15 @@
         }
 
         gridStep = (gridStep + 1) % 64;
+        totalStepsPlayed++;
     }
 
     function startEngine() {
         initAudio();
         isPlaying = true;
-        performanceStartTime = Date.now();
-        recordedMidiEvents = [];
+        totalStepsPlayed = 0;
+        gridStep = 0;
+        recordedEvents = [];
 
         document.getElementById('btnRun').innerText = '■ STOP ENGINE';
 
@@ -376,7 +397,7 @@
         if (isRecordingWav) stopAudioRecording();
     }
 
-    // WAV AUDIO RECORDING FUNCTIONALITY
+    // AUDIO WAV RECORDING
     function toggleAudioRecording() {
         initAudio();
         const btn = document.getElementById('btnRecWav');
@@ -413,81 +434,87 @@
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `generative_composition_${Date.now()}.wav`;
+        a.download = `composition_${Date.now()}.wav`;
         a.click();
         URL.revokeObjectURL(url);
     }
 
-    // MULTITRACK MIDI FILE EXPORT ENGINE
+    // ROBUST MULTITRACK MIDI EXPORTER (SMF Format 0 Binary)
+    function writeVLQ(value) {
+        let buffer = [];
+        let num = value;
+        buffer.push(num & 0x7F);
+        while ((num >>= 7) > 0) {
+            buffer.push((num & 0x7F) | 0x80);
+        }
+        return buffer.reverse();
+    }
+
     function exportMidiFile() {
-        if (recordedMidiEvents.length === 0) {
-            alert('No notes recorded yet! Run the engine for a few seconds first.');
+        if (recordedEvents.length === 0) {
+            alert('No notes recorded! Run the engine to generate music first.');
             return;
         }
 
-        // Standard MIDI Header and Track chunk generation
-        function writeVarInt(val) {
-            let buffer = [];
-            let b = val & 0x7F;
-            val >>= 7;
-            while (val > 0) {
-                buffer.push(b | 0x80);
-                b = val & 0x7F;
-                val >>= 7;
-            }
-            buffer.push(b);
-            return buffer.reverse();
-        }
-
         const ticksPerQuarter = 480;
-        const ticksPerMs = (ticksPerQuarter * tempo) / 60000;
+        const ticksPerStep = ticksPerQuarter / 4; // 16th note steps
 
-        let midiBytes = [
+        // Flatten all note-on and note-off events
+        let rawEvents = [];
+        recordedEvents.forEach(e => {
+            const startTick = e.step * ticksPerStep;
+            const durationTicks = e.durationSteps * ticksPerStep;
+
+            const channel = (e.track === 'bass' ? 1 : (e.track === 'chords' ? 2 : 0));
+
+            rawEvents.push({ tick: startTick, type: 0x90 | channel, pitch: e.pitch, vel: 0x64 });
+            rawEvents.push({ tick: startTick + durationTicks, type: 0x80 | channel, pitch: e.pitch, vel: 0x00 });
+        });
+
+        // Sort chronologically
+        rawEvents.sort((a, b) => a.tick - b.tick);
+
+        let trackBytes = [];
+        let lastTick = 0;
+
+        // Set Tempo Meta Event (Microseconds per Quarter Note)
+        const mpqn = Math.round(60000000 / tempo);
+        trackBytes.push(0x00, 0xFF, 0x51, 0x03, (mpqn >> 16) & 0xFF, (mpqn >> 8) & 0xFF, mpqn & 0xFF);
+
+        rawEvents.forEach(ev => {
+            const delta = Math.max(0, ev.tick - lastTick);
+            lastTick = ev.tick;
+
+            const vlqDelta = writeVLQ(delta);
+            trackBytes.push(...vlqDelta, ev.type, ev.pitch & 0x7F, ev.vel & 0x7F);
+        });
+
+        // End of Track Meta Event
+        trackBytes.push(0x00, 0xFF, 0x2F, 0x00);
+
+        // Track Chunk Header
+        const trackLen = trackBytes.length;
+        const trackChunk = [
+            0x4D, 0x54, 0x72, 0x6B, // 'MTrk'
+            (trackLen >> 24) & 0xFF, (trackLen >> 16) & 0xFF, (trackLen >> 8) & 0xFF, trackLen & 0xFF,
+            ...trackBytes
+        ];
+
+        // Header Chunk Format 0
+        const headerChunk = [
             0x4D, 0x54, 0x68, 0x64, // 'MThd'
-            0x00, 0x00, 0x00, 0x06, // Header length
-            0x00, 0x00,             // Single track format
+            0x00, 0x00, 0x00, 0x06, // Chunk length
+            0x00, 0x00,             // Format 0
             0x00, 0x01,             // 1 Track
             (ticksPerQuarter >> 8) & 0xFF, ticksPerQuarter & 0xFF
         ];
 
-        let trackEvents = [];
-        let sorted = [...recordedMidiEvents].sort((a, b) => a.time - b.time);
-
-        let lastTimeTicks = 0;
-        sorted.forEach(ev => {
-            const startTicks = Math.round(ev.time * ticksPerMs);
-            const deltaTime = Math.max(0, startTicks - lastTimeTicks);
-            lastTimeTicks = startTicks;
-
-            const channel = (ev.track === 'bass' ? 1 : (ev.track === 'chords' ? 2 : 0));
-
-            // Note On
-            trackEvents.push(...writeVarInt(deltaTime), 0x90 | channel, ev.pitch & 0x7F, 0x64);
-
-            // Note Off after duration
-            const durTicks = Math.round(ev.duration * ticksPerMs);
-            trackEvents.push(...writeVarInt(durTicks), 0x80 | channel, ev.pitch & 0x7F, 0x00);
-            lastTimeTicks += durTicks;
-        });
-
-        // End of Track Meta Event
-        trackEvents.push(0x00, 0xFF, 0x2F, 0x00);
-
-        const trackLength = trackEvents.length;
-        let trackHeader = [
-            0x4D, 0x54, 0x72, 0x6B, // 'MTrk'
-            (trackLength >> 24) & 0xFF,
-            (trackLength >> 16) & 0xFF,
-            (trackLength >> 8) & 0xFF,
-            trackLength & 0xFF
-        ];
-
-        const fullMidi = new Uint8Array([...midiBytes, ...trackHeader, ...trackEvents]);
+        const fullMidi = new Uint8Array([...headerChunk, ...trackChunk]);
         const blob = new Blob([fullMidi], { type: 'audio/midi' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `generative_composition_${Date.now()}.mid`;
+        a.download = `generative_track_${Date.now()}.mid`;
         a.click();
         URL.revokeObjectURL(url);
     }

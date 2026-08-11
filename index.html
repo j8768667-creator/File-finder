@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Generative Music Studio — Lorenz Chaos & Movement Engine</title>
+    <title>Generative Music Studio — Functional Movement & Synthesis</title>
     <style>
         :root {
             --bg-color: #121816;
@@ -20,89 +20,63 @@
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: var(--font-mono); user-select: none; }
-        body { background-color: var(--bg-color); color: var(--text-main); display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; padding: 20px; }
+        body { background-color: var(--bg-color); color: var(--text-main); display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; padding: 24px; }
 
-        .dashboard { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 16px; width: 100%; max-width: 1200px; }
-        @media (max-width: 950px) { .dashboard { grid-template-columns: 1fr; } }
+        .dashboard { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; width: 100%; max-width: 1100px; }
+        @media (max-width: 850px) { .dashboard { grid-template-columns: 1fr; } }
 
-        .column { display: flex; flex-direction: column; gap: 16px; }
-        .panel { background-color: var(--panel-bg); border: 1px solid var(--panel-border); border-radius: 8px; padding: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
-        .panel-header { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); margin-bottom: 12px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
+        .column { display: flex; flex-direction: column; gap: 20px; }
+        .panel { background-color: var(--panel-bg); border: 1px solid var(--panel-border); border-radius: 8px; padding: 18px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+        .panel-header { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); margin-bottom: 14px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
 
-        .header-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
-        .btn { background-color: var(--accent-cyan); color: #121816; border: none; padding: 12px; font-weight: bold; font-size: 13px; letter-spacing: 1px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s; }
+        .header-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .btn { background-color: var(--accent-cyan); color: #121816; border: none; padding: 14px; font-weight: bold; font-size: 13px; letter-spacing: 1px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s; }
+        .btn:hover { filter: brightness(1.1); }
         .btn-run.active { background-color: var(--accent-amber); color: #121816; }
         .btn-rec { background-color: var(--input-bg); color: var(--accent-rose); border: 1px solid rgba(226, 109, 109, 0.4); }
         .btn-rec.recording { background-color: var(--accent-rose); color: #fff; animation: pulse 1.5s infinite; }
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
 
-        canvas { width: 100%; background-color: var(--input-bg); border: 1px solid var(--panel-border); border-radius: 6px; display: block; }
-        .canvas-meta { font-size: 11px; color: var(--text-dim); margin-top: 6px; display: flex; justify-content: space-between; }
-
-        .control-group { margin-bottom: 12px; }
+        .control-group { margin-bottom: 14px; }
         .control-label { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-dim); margin-bottom: 6px; text-transform: uppercase; }
-        .select-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-        select, input[type="range"] { width: 100%; background-color: var(--input-bg); border: 1px solid var(--panel-border); color: var(--text-main); padding: 8px 10px; border-radius: 6px; font-family: inherit; outline: none; }
-        input[type="range"] { -webkit-appearance: none; height: 4px; border: none; }
+        .select-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        select, input[type="range"] { width: 100%; background-color: var(--input-bg); border: 1px solid var(--panel-border); color: var(--text-main); padding: 9px 10px; border-radius: 6px; font-family: inherit; outline: none; }
+        input[type="range"] { -webkit-appearance: none; height: 4px; border: none; margin-top: 6px; }
         input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: var(--accent-cyan); cursor: pointer; }
 
         .slider-val { color: var(--accent-amber); font-weight: bold; font-size: 11px; }
 
-        .toggle-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-        .toggle-btn { background-color: var(--input-bg); border: 1px solid var(--panel-border); color: var(--text-dim); padding: 8px; font-size: 11px; border-radius: 6px; text-align: center; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
-        .toggle-btn.active { border-color: var(--accent-cyan); color: var(--accent-cyan); font-weight: bold; }
+        .toggle-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .toggle-btn { background-color: var(--input-bg); border: 1px solid var(--panel-border); color: var(--text-dim); padding: 10px; font-size: 11px; border-radius: 6px; text-align: center; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: bold; }
+        .toggle-btn.active { border-color: var(--accent-cyan); color: var(--accent-cyan); background-color: rgba(76, 217, 192, 0.1); }
         .indicator { width: 6px; height: 6px; border-radius: 50%; background-color: var(--accent-cyan); }
 
-        .genre-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-        .genre-chip { background-color: var(--input-bg); border: 1px solid var(--panel-border); color: var(--text-dim); padding: 8px 4px; font-size: 10px; border-radius: 6px; cursor: pointer; text-align: center; font-weight: bold; }
-        .genre-chip.active { border-color: var(--accent-purple); color: var(--accent-purple); background-color: rgba(155, 114, 207, 0.15); }
+        .genre-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+        .genre-chip { background-color: var(--input-bg); border: 1px solid var(--panel-border); color: var(--text-dim); padding: 9px 4px; font-size: 10px; border-radius: 6px; cursor: pointer; text-align: center; font-weight: bold; transition: all 0.15s; }
+        .genre-chip:hover { border-color: var(--accent-purple); }
+        .genre-chip.active { border-color: var(--accent-purple); color: #fff; background-color: var(--accent-purple); }
 
-        .emotion-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; margin-bottom: 8px; }
-        .emotion-chip { background-color: var(--input-bg); border: 1px solid var(--panel-border); color: var(--text-dim); padding: 6px 2px; font-size: 9px; border-radius: 4px; text-align: center; cursor: pointer; text-transform: uppercase; }
-        .emotion-chip.active { border-color: var(--accent-rose); color: var(--accent-rose); background-color: rgba(226, 109, 109, 0.15); }
+        .emotion-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+        .emotion-chip { background-color: var(--input-bg); border: 1px solid var(--panel-border); color: var(--text-dim); padding: 8px 2px; font-size: 9px; border-radius: 4px; text-align: center; cursor: pointer; text-transform: uppercase; font-weight: bold; transition: all 0.15s; }
+        .emotion-chip:hover { border-color: var(--accent-rose); }
+        .emotion-chip.active { border-color: var(--accent-rose); color: #fff; background-color: var(--accent-rose); }
 
-        .info-card { font-size: 10px; line-height: 1.4; color: var(--text-dim); background-color: var(--input-bg); border: 1px solid var(--panel-border); padding: 10px; border-radius: 6px; }
+        .status-card { font-size: 11px; line-height: 1.5; color: var(--text-dim); background-color: var(--input-bg); border: 1px solid var(--panel-border); padding: 12px; border-radius: 6px; display: flex; justify-content: space-between; }
+        .status-val { color: var(--accent-cyan); font-weight: bold; }
     </style>
 </head>
 <body>
 
 <div class="dashboard">
     <div class="column">
-        <div class="panel">
-            <canvas id="lorenzCanvas" height="230"></canvas>
-            <div class="canvas-meta">
-                <span>CH·A pitch p=<span id="pValDisp">28.0</span> · CH·R rhythm</span>
-                <span>A4 2n over D · notes: <span id="noteCount">503</span></span>
-            </div>
+        <div class="header-actions">
+            <button class="btn btn-run" id="btnRun">► RUN ENGINE</button>
+            <button class="btn btn-rec" id="btnRec"><span style="color:var(--accent-rose)">●</span> REC MIDI</button>
         </div>
 
-        <div class="panel">
-            <div class="panel-header">P(NEXT NOTE) — SOFTMAX OVER BLENDED LOGITS, T=<span id="tempDisp">0.80</span></div>
-            <canvas id="probCanvas" height="70"></canvas>
-            <div class="info-card" style="margin-top: 8px;">
-                G3 ... F#6 — matrix learns from its own output, reward-weighted by interval consonance (policy-gradient update)
-            </div>
-        </div>
-
-        <div class="panel">
-            <div class="panel-header">EMOTION — FEELING: <span id="feelingDisp" style="color: var(--accent-rose)">JOYFUL</span></div>
-            <div class="emotion-grid">
-                <div class="emotion-chip" data-feel="DRIFT">DRIFT</div>
-                <div class="emotion-chip" data-feel="SERENE">SERENE</div>
-                <div class="emotion-chip active" data-feel="JOYFUL">JOYFUL</div>
-                <div class="emotion-chip" data-feel="EPIC">EPIC</div>
-                <div class="emotion-chip" data-feel="MELANCHOLY">MELANCHOLY</div>
-                <div class="emotion-chip" data-feel="TENSE">TENSE</div>
-            </div>
-            <canvas id="moodCanvas" height="110"></canvas>
-            <div class="canvas-meta">
-                <span>← dark · valence · bright →</span>
-                <span>↑ intense · calm ↓</span>
-            </div>
-            <div class="control-group" style="margin-top: 8px;">
-                <div class="control-label"><span>MOOD DEPTH</span><span id="depthVal" class="slider-val">14%</span></div>
-                <input type="range" id="depthSlider" min="0" max="100" value="14">
-            </div>
+        <div class="status-card">
+            <span>NOW PLAYING CHORD: <span class="status-val" id="currentChordDisp">G Major</span></span>
+            <span>NOTES GENERATED: <span class="status-val" id="noteCount">0</span></span>
         </div>
 
         <div class="panel">
@@ -120,14 +94,53 @@
                 <div class="genre-chip" data-genre="EDM">EDM</div>
             </div>
         </div>
+
+        <div class="panel">
+            <div class="panel-header">MOOD / EMOTION: <span id="feelingDisp" style="color: var(--accent-rose)">JOYFUL</span></div>
+            <div class="emotion-grid" id="emotionButtons">
+                <div class="emotion-chip" data-feel="DRIFT">DRIFT</div>
+                <div class="emotion-chip" data-feel="SERENE">SERENE</div>
+                <div class="emotion-chip active" data-feel="JOYFUL">JOYFUL</div>
+                <div class="emotion-chip" data-feel="EPIC">EPIC</div>
+                <div class="emotion-chip" data-feel="MELANCHOLY">MELANCHOLY</div>
+                <div class="emotion-chip" data-feel="TENSE">TENSE</div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-header">SOUND DESIGN SYNTH CONTROLS</div>
+            
+            <div class="control-group">
+                <div class="control-label"><span>LEAD WAVEFORM</span></div>
+                <select id="leadWaveSelect">
+                    <option value="sawtooth" selected>Sawtooth (Rich Detuned Lead)</option>
+                    <option value="square">Square (8-Bit Pulse)</option>
+                    <option value="triangle">Triangle (Flute / Warm Reed)</option>
+                    <option value="sine">Sine (Pure Warm Tone)</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <div class="control-label"><span>FILTER CUTOFF FREQUENCY</span><span id="cutoffVal" class="slider-val">3500 Hz</span></div>
+                <input type="range" id="cutoffSlider" min="200" max="10000" step="50" value="3500">
+            </div>
+
+            <div class="control-group">
+                <div class="select-row">
+                    <div>
+                        <div class="control-label"><span>ATTACK TIME</span><span id="attackVal" class="slider-val">0.02s</span></div>
+                        <input type="range" id="attackSlider" min="0.005" max="0.5" step="0.005" value="0.02">
+                    </div>
+                    <div>
+                        <div class="control-label"><span>RELEASE TIME</span><span id="releaseVal" class="slider-val">0.40s</span></div>
+                        <input type="range" id="releaseSlider" min="0.05" max="2.0" step="0.05" value="0.40">
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div class="column">
-        <div class="header-actions">
-            <button class="btn btn-run" id="btnRun">► RUN</button>
-            <button class="btn btn-rec" id="btnRec"><span style="color:var(--accent-rose)">●</span> REC</button>
-        </div>
-
         <div class="panel">
             <div class="panel-header">MUSIC THEORY & SCALES</div>
             <div class="control-group">
@@ -151,29 +164,21 @@
                             <option value="minor">Minor</option>
                             <option value="dorian">Dorian</option>
                             <option value="mixolydian">Mixolydian</option>
+                            <option value="pentatonic">Pentatonic</option>
                         </select>
                     </div>
                 </div>
             </div>
 
             <div class="control-group">
-                <div class="control-label"><span>TEMPO</span><span id="tempoVal" class="slider-val">112bpm</span></div>
-                <input type="range" id="tempoSlider" min="60" max="170" value="112">
-            </div>
-
-            <div class="control-group">
-                <div class="control-label"><span>LEAD SOUND</span></div>
-                <select id="leadSoundSelect">
-                    <option value="piano" selected>Piano (Warm Grand)</option>
-                    <option value="saw">Analog Saw Lead</option>
-                    <option value="sine">Pure Warm Sine</option>
-                </select>
+                <div class="control-label"><span>TEMPO</span><span id="tempoVal" class="slider-val">112 bpm</span></div>
+                <input type="range" id="tempoSlider" min="60" max="180" value="112">
             </div>
         </div>
 
         <div class="panel">
-            <div class="panel-header">MIXER & HARMONY — CHORD: <span id="currentChordDisp" style="color:var(--accent-amber)">D</span></div>
-            <div class="toggle-row" style="margin-bottom: 10px;">
+            <div class="panel-header">MIXER & HARMONY</div>
+            <div class="toggle-row" style="margin-bottom: 12px;">
                 <div class="toggle-btn active" id="toggleChords"><div class="indicator"></div> Chords</div>
                 <div class="toggle-btn active" id="toggleBass"><div class="indicator"></div> Bass</div>
             </div>
@@ -186,35 +191,16 @@
             <div class="control-group">
                 <div class="control-label"><span>ACCOMPANIMENT STYLE</span></div>
                 <select id="styleSelect">
-                    <option value="chaos" selected>Chaos Grooves</option>
-                    <option value="walking">Walking Bass with Arpeggios</option>
-                    <option value="stride">Stride Oom-Pah</option>
-                    <option value="pad">Slow Rolled Pads</option>
+                    <option value="groove" selected>Syncopated Grooves</option>
+                    <option value="arpeggiated">Arpeggiated Cascade</option>
+                    <option value="stride">Stride Rhythm Stabs</option>
+                    <option value="pad">Sustained Warm Pads</option>
                 </select>
-            </div>
-
-            <div class="control-group">
-                <div class="select-row">
-                    <div>
-                        <div class="control-label"><span>CHORD SOUND</span></div>
-                        <select id="chordSoundSelect">
-                            <option value="softpiano" selected>Soft Piano</option>
-                            <option value="analog">Analog Pad</option>
-                        </select>
-                    </div>
-                    <div>
-                        <div class="control-label"><span>BASS SOUND</span></div>
-                        <select id="bassSoundSelect">
-                            <option value="fm" selected>FM Knock</option>
-                            <option value="sub">Clean Sub-Bass</option>
-                        </select>
-                    </div>
-                </div>
             </div>
         </div>
 
         <div class="panel">
-            <div class="panel-header">CHAOS ↔ LEARNING</div>
+            <div class="panel-header">CHAOS & EXPRESSION PARAMETERS</div>
             
             <div class="control-group">
                 <div class="control-label"><span>P (LORENZ CHAOS PARAMETER)</span><span id="rhoVal" class="slider-val">28.0</span></div>
@@ -233,128 +219,131 @@
                     </div>
                 </div>
             </div>
-
-            <div class="control-group">
-                <div class="control-label"><span>BLEND — POLICY ↔ CHAOS</span><span id="blendVal" class="slider-val">CH 50%</span></div>
-                <input type="range" id="blendSlider" min="0" max="100" value="50">
-            </div>
-
-            <div class="control-group">
-                <div class="control-label"><span>SOFTMAX TEMPERATURE</span><span id="tempVal" class="slider-val">0.80</span></div>
-                <input type="range" id="tempSlider" min="0.1" max="2.0" step="0.05" value="0.80">
-            </div>
-
-            <div class="info-card">
-                ρ &lt; 24.7 settles to a fixed point. ρ ≈ 28 is classic chaos. Temperature: low = greedy, high = exploratory.
-            </div>
         </div>
     </div>
 </div>
 
 <script>
-    // --- MASTER AUDIO BUS & SOUND DESIGN ENGINE ---
+    // --- SYNTHESIS & AUDIO BUS STATE ---
     let audioCtx = null;
-    let masterCompressor = null;
     let masterGain = null;
-    let filterNode = null;
+    let masterLimiter = null;
+    let mainFilter = null;
+    let delayNode = null;
+    let delayFeedback = null;
 
     let isPlaying = false;
-    let isRecording = false;
     let playTimer = null;
-
-    let tempo = 112;
     let gridStep = 0;
-    let totalNotesPlayed = 503;
+    let totalNotes = 0;
 
-    // Parameters
-    let lorenzRho = 28.0;
+    // Controls State
+    let tempo = 112;
+    let filterCutoff = 3500;
+    let attackTime = 0.02;
+    let releaseTime = 0.40;
     let chordTonePull = 0.70;
-    let softmaxTemp = 0.80;
+    let chaosRho = 28.0;
+    let rhythmSpread = 60;
+    let graceNoteChance = 15;
     let chordsEnabled = true;
     let bassEnabled = true;
 
-    // Movement Engine State
+    // Movement Engine
     let previousChordVoicing = [];
-    let lastMelodicPitch = 67; // G4
+    let lastMelodyPitch = 67; // G4
     let lastLeapWasUp = false;
 
-    // Scaled & Harmonic Definitions
     const SCALES = {
         major: [0, 2, 4, 5, 7, 9, 11],
         minor: [0, 2, 3, 5, 7, 8, 10],
         dorian: [0, 2, 3, 5, 7, 9, 10],
-        mixolydian: [0, 2, 4, 5, 7, 9, 10]
+        mixolydian: [0, 2, 4, 5, 7, 9, 10],
+        pentatonic: [0, 2, 4, 7, 9]
     };
-    const PROGRESSION_DEGREES = [0, 4, 5, 3]; // I - V - vi - IV
+
+    const PROGRESSIONS = [
+        [0, 4, 5, 3], // I - V - vi - IV
+        [0, 5, 3, 4], // I - vi - IV - V
+        [5, 3, 0, 4]  // vi - IV - I - V
+    ];
+    let currentProgression = PROGRESSIONS[0];
 
     function mtof(midi) { return 440 * Math.pow(2, (midi - 69) / 12); }
 
-    // ROCKS SOLID AUDIO CONTEXT INITIALIZATION & RECOVERY
+    // --- AUDIO SYSTEM INITIALIZATION ---
     function initAudio() {
         if (!audioCtx) {
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-            // Master Limiter to eliminate bass distortion in Sound.wav
-            masterCompressor = audioCtx.createDynamicsCompressor();
-            masterCompressor.threshold.setValueAtTime(-6.0, audioCtx.currentTime);
-            masterCompressor.knee.setValueAtTime(0, audioCtx.currentTime);
-            masterCompressor.ratio.setValueAtTime(15.0, audioCtx.currentTime);
+            masterLimiter = audioCtx.createDynamicsCompressor();
+            masterLimiter.threshold.setValueAtTime(-4.0, audioCtx.currentTime);
+            masterLimiter.ratio.setValueAtTime(12.0, audioCtx.currentTime);
 
             masterGain = audioCtx.createGain();
-            masterGain.gain.setValueAtTime(0.65, audioCtx.currentTime);
+            masterGain.gain.setValueAtTime(0.7, audioCtx.currentTime);
 
-            filterNode = audioCtx.createBiquadFilter();
-            filterNode.type = 'lowpass';
-            filterNode.frequency.setValueAtTime(3200, audioCtx.currentTime);
+            mainFilter = audioCtx.createBiquadFilter();
+            mainFilter.type = 'lowpass';
+            mainFilter.frequency.setValueAtTime(filterCutoff, audioCtx.currentTime);
 
-            masterGain.connect(filterNode);
-            filterNode.connect(masterCompressor);
-            masterCompressor.connect(audioCtx.destination);
+            // Delay effect bus
+            delayNode = audioCtx.createDelay();
+            delayNode.delayTime.setValueAtTime(0.25, audioCtx.currentTime); // Dotted 8th-like delay
+            delayFeedback = audioCtx.createGain();
+            delayFeedback.gain.setValueAtTime(0.25, audioCtx.currentTime);
+
+            delayNode.connect(delayFeedback);
+            delayFeedback.connect(delayNode);
+
+            // Routing
+            masterGain.connect(mainFilter);
+            mainFilter.connect(masterLimiter);
+            mainFilter.connect(delayNode);
+            delayNode.connect(masterLimiter);
+            masterLimiter.connect(audioCtx.destination);
         }
 
-        // Fixes no-sound on repeat play cycles
         if (audioCtx.state === 'suspended') {
             audioCtx.resume();
         }
     }
 
-    // ENHANCED VOICE WITH LFO VIBRATO & EXPONENTIAL ADSR
-    function playExpressiveSynth(freq, type, duration, vol, isMelody = false) {
+    // --- RICH DUAL-OSCILLATOR SYNTHESIS ENGINE ---
+    function playTone(midiPitch, wave, duration, gainLevel, isMelody = false) {
         if (!audioCtx) return;
         const now = audioCtx.currentTime;
 
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
+        // Primary Oscillator
+        const osc1 = audioCtx.createOscillator();
+        const osc2 = audioCtx.createOscillator(); // Detuned 2nd Osc for warmth
+        const noteGain = audioCtx.createGain();
 
-        osc.type = type;
-        osc.frequency.setValueAtTime(freq, now);
+        const freq = mtof(midiPitch);
+        osc1.type = wave;
+        osc2.type = wave;
 
-        // LFO Vibrato on sustained melody notes
-        if (isMelody && duration > 0.25) {
-            const vibrato = audioCtx.createOscillator();
-            const vibGain = audioCtx.createGain();
-            vibrato.frequency.setValueAtTime(5.0, now);
-            vibGain.gain.setValueAtTime(freq * 0.01, now);
-            vibrato.connect(vibGain);
-            vibGain.connect(osc.frequency);
-            vibrato.start(now + 0.08);
-            vibrato.stop(now + duration);
-        }
+        osc1.frequency.setValueAtTime(freq, now);
+        // Subtle 7-cent detune on second osc for rich musical timbre
+        osc2.frequency.setValueAtTime(freq * Math.pow(2, 7 / 1200), now);
 
-        // Exponential Envelope
-        gain.gain.setValueAtTime(0.0001, now);
-        gain.gain.linearRampToValueAtTime(vol, now + 0.015);
-        gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, vol * 0.3), now + 0.1);
-        gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+        // Attack & Release Envelope
+        noteGain.gain.setValueAtTime(0.0001, now);
+        noteGain.gain.linearRampToValueAtTime(gainLevel, now + attackTime);
+        noteGain.gain.exponentialRampToValueAtTime(Math.max(0.0001, gainLevel * 0.3), now + attackTime + 0.1);
+        noteGain.gain.exponentialRampToValueAtTime(0.0001, now + duration + releaseTime);
 
-        osc.connect(gain);
-        gain.connect(masterGain);
+        osc1.connect(noteGain);
+        osc2.connect(noteGain);
+        noteGain.connect(masterGain);
 
-        osc.start(now);
-        osc.stop(now + duration + 0.05);
+        osc1.start(now);
+        osc2.start(now);
+        osc1.stop(now + duration + releaseTime + 0.05);
+        osc2.stop(now + duration + releaseTime + 0.05);
     }
 
-    // VOICE LEADING ALGORITHM
+    // --- HARMONY & MOVEMENT LOGIC ---
     function applyVoiceLeading(targetPitches, prevPitches) {
         if (!prevPitches || prevPitches.length === 0) return targetPitches;
         return targetPitches.map((pitch, idx) => {
@@ -374,24 +363,23 @@
         }).sort((a, b) => a - b);
     }
 
-    // MELODIC CONJUNCT / DISJUNCT MOVEMENT (GOLDEN RULE OF LEAPS)
     function calculateMelodyNote(rootMidi, scale, currentChord) {
-        let nextPitch = lastMelodicPitch;
+        let nextPitch = lastMelodyPitch;
 
+        // Golden Rule of Leaps
         if (lastLeapWasUp) {
-            // Counterbalance upward leap with gentle downward step
-            nextPitch -= (Math.random() < 0.7 ? 2 : 1);
+            nextPitch -= (Math.random() < 0.75 ? 2 : 1); // Counterbalance upward leap
             lastLeapWasUp = false;
         } else {
-            if (Math.random() < 0.28) { // Disjunct leap
+            if (Math.random() < (chaosRho / 100)) { // Chaos parameter influences leap probability
                 nextPitch += (Math.random() < 0.5 ? 5 : 7);
                 lastLeapWasUp = true;
-            } else { // Conjunct step
+            } else {
                 nextPitch += (Math.random() < 0.5 ? 2 : -2);
             }
         }
 
-        // Pull toward chord tones
+        // Chord-Tone Attraction
         if (Math.random() < chordTonePull) {
             const upperChord = currentChord.map(p => p + 12);
             nextPitch = upperChord.reduce((prev, curr) => 
@@ -399,21 +387,21 @@
             );
         }
 
-        lastMelodicPitch = nextPitch;
+        lastMelodyPitch = nextPitch;
         return nextPitch;
     }
 
-    // MAIN GENERATIVE STEP LOOP
+    // --- MAIN GENERATIVE ENGINE STEP ---
     function tick() {
-        const rootMidi = parseInt(document.getElementById('rootSelect').value) + 55; // G3
+        const rootMidi = parseInt(document.getElementById('rootSelect').value) + 48; // C3
         const scaleType = document.getElementById('scaleSelect').value;
         const scale = SCALES[scaleType] || SCALES.major;
 
         const stepInBar = gridStep % 16;
-        const barIdx = Math.floor(gridStep / 16) % PROGRESSION_DEGREES.length;
-        const degree = PROGRESSION_DEGREES[barIdx];
+        const barIdx = Math.floor(gridStep / 16) % currentProgression.length;
+        const degree = currentProgression[barIdx];
 
-        // Chord Notes Calculation
+        // 1. Calculate Voiced Chord
         const numScale = scale.length;
         const rawChord = [
             rootMidi + scale[degree % numScale],
@@ -424,173 +412,179 @@
         previousChordVoicing = voicedChord;
 
         // UI Updates
-        const chordNames = ['G', 'D', 'Em', 'C'];
-        document.getElementById('currentChordDisp').innerText = chordNames[barIdx];
+        const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        const rootName = noteNames[(rootMidi + scale[degree % numScale]) % 12];
+        document.getElementById('currentChordDisp').innerText = `${rootName} Chord`;
 
-        // 1. Play Chords
-        if (chordsEnabled && (stepInBar === 0 || stepInBar === 6)) {
-            voicedChord.forEach((p, i) => {
-                setTimeout(() => playExpressiveSynth(mtof(p), 'triangle', 0.45, 0.12), i * 12);
-            });
+        // 2. Play Chords
+        const style = document.getElementById('styleSelect').value;
+        if (chordsEnabled) {
+            if (style === 'pad' && stepInBar === 0) {
+                voicedChord.forEach(p => playTone(mtof(p), 'triangle', 2.0, 0.10));
+            } else if ((style === 'groove' || style === 'stride') && (stepInBar === 0 || stepInBar === 6 || stepInBar === 10)) {
+                voicedChord.forEach((p, i) => {
+                    setTimeout(() => playTone(mtof(p), 'triangle', 0.35, 0.12), i * 15);
+                });
+            } else if (style === 'arpeggiated' && stepInBar % 2 === 0) {
+                const note = voicedChord[(stepInBar / 2) % voicedChord.length];
+                playTone(mtof(note), 'sine', 0.25, 0.14);
+            }
         }
 
-        // 2. Play Bass
+        // 3. Play Bass
         if (bassEnabled && (stepInBar % 4 === 0)) {
-            playExpressiveSynth(mtof(voicedChord[0] - 12), 'sine', 0.35, 0.25);
+            playTone(mtof(voicedChord[0] - 12), 'sawtooth', 0.3, 0.22);
         }
 
-        // 3. Play Melody with Movement
+        // 4. Play Lead Melody
         if (stepInBar % 2 === 0) {
-            const melPitch = calculateMelodyNote(rootMidi, scale, voicedChord);
-            const soundType = document.getElementById('leadSoundSelect').value;
-            const wave = soundType === 'saw' ? 'sawtooth' : (soundType === 'sine' ? 'sine' : 'triangle');
-            
-            playExpressiveSynth(mtof(melPitch), wave, 0.22, 0.18, true);
-            
-            totalNotesPlayed++;
-            document.getElementById('noteCount').innerText = totalNotesPlayed;
+            if (Math.random() * 100 < rhythmSpread) {
+                const wave = document.getElementById('leadWaveSelect').value;
+                const melPitch = calculateMelodyNote(rootMidi + 12, scale, voicedChord);
+                
+                // Grace note embellishment
+                if (Math.random() * 100 < graceNoteChance) {
+                    playTone(mtof(melPitch - 1), wave, 0.08, 0.08, true);
+                }
+
+                playTone(mtof(melPitch), wave, 0.28, 0.18, true);
+                totalNotes++;
+                document.getElementById('noteCount').innerText = totalNotes;
+            }
         }
 
         gridStep = (gridStep + 1) % 64;
-        updateProbabilityCanvas();
     }
 
     function startEngine() {
         initAudio();
         isPlaying = true;
-        document.getElementById('btnRun').innerText = '■ STOP';
+        document.getElementById('btnRun').innerText = '■ STOP ENGINE';
         document.getElementById('btnRun').classList.add('active');
 
-        const stepInterval = (60 / tempo) * 1000 / 4; // 16th resolution
+        const stepInterval = (60 / tempo) * 1000 / 4;
         playTimer = setInterval(tick, stepInterval);
     }
 
     function stopEngine() {
         isPlaying = false;
         if (playTimer) { clearInterval(playTimer); playTimer = null; }
-        document.getElementById('btnRun').innerText = '► RUN';
+        document.getElementById('btnRun').innerText = '► RUN ENGINE';
         document.getElementById('btnRun').classList.remove('active');
     }
 
-    // --- LORENZ ATTRACTOR CANVAS ANIMATION ---
-    const lCanvas = document.getElementById('lorenzCanvas');
-    const lCtx = lCanvas.getContext('2d');
-    let lx = 0.1, ly = 0, lz = 0;
+    // --- GENRE PRESETS CONFIGURATOR ---
+    const GENRE_CONFIGS = {
+        JAZZ: { tempo: 120, scale: 'dorian', wave: 'triangle', cutoff: 2400, attack: 0.04, release: 0.5, spread: 75, pull: 0.6 },
+        LOFI: { tempo: 82, scale: 'minor', wave: 'sine', cutoff: 1800, attack: 0.08, release: 0.6, spread: 50, pull: 0.8 },
+        SYNTHWAVE: { tempo: 112, scale: 'minor', wave: 'sawtooth', cutoff: 3800, attack: 0.01, release: 0.35, spread: 80, pull: 0.7 },
+        CLASSICAL: { tempo: 96, scale: 'major', wave: 'triangle', cutoff: 3200, attack: 0.05, release: 0.7, spread: 65, pull: 0.85 },
+        AMBIENT: { tempo: 70, scale: 'pentatonic', wave: 'sine', cutoff: 1400, attack: 0.25, release: 1.5, spread: 40, pull: 0.9 },
+        FUNK: { tempo: 116, scale: 'mixolydian', wave: 'square', cutoff: 4500, attack: 0.01, release: 0.2, spread: 90, pull: 0.5 },
+        ROCK: { tempo: 130, scale: 'minor', wave: 'sawtooth', cutoff: 5000, attack: 0.01, release: 0.3, spread: 85, pull: 0.6 },
+        BLUES: { tempo: 88, scale: 'mixolydian', wave: 'triangle', cutoff: 2800, attack: 0.03, release: 0.45, spread: 70, pull: 0.65 },
+        POP: { tempo: 124, scale: 'major', wave: 'sawtooth', cutoff: 4200, attack: 0.015, release: 0.35, spread: 85, pull: 0.75 },
+        EDM: { tempo: 128, scale: 'minor', wave: 'sawtooth', cutoff: 6500, attack: 0.005, release: 0.25, spread: 95, pull: 0.5 }
+    };
 
-    function renderLorenz() {
-        lCanvas.width = lCanvas.clientWidth;
-        const w = lCanvas.width;
-        const h = lCanvas.height;
+    function applyGenre(genreKey) {
+        const cfg = GENRE_CONFIGS[genreKey];
+        if (!cfg) return;
 
-        lCtx.fillStyle = '#141c1a';
-        lCtx.fillRect(0, 0, w, h);
+        tempo = cfg.tempo;
+        document.getElementById('tempoSlider').value = tempo;
+        document.getElementById('tempoVal').innerText = `${tempo} bpm`;
 
-        lCtx.strokeStyle = 'rgba(76, 217, 192, 0.4)';
-        lCtx.lineWidth = 1.2;
-        lCtx.beginPath();
+        document.getElementById('scaleSelect').value = cfg.scale;
+        document.getElementById('leadWaveSelect').value = cfg.wave;
 
-        let x = lx, y = ly, z = lz;
-        let dt = 0.008;
-        let sigma = 10, beta = 8/3;
+        filterCutoff = cfg.cutoff;
+        document.getElementById('cutoffSlider').value = filterCutoff;
+        document.getElementById('cutoffVal').innerText = `${filterCutoff} Hz`;
+        if (mainFilter && audioCtx) mainFilter.frequency.setValueAtTime(filterCutoff, audioCtx.currentTime);
 
-        for (let i = 0; i < 400; i++) {
-            let dx = sigma * (y - x) * dt;
-            let dy = (x * (lorenzRho - z) - y) * dt;
-            let dz = (x * y - beta * z) * dt;
-            x += dx; y += dy; z += dz;
+        attackTime = cfg.attack;
+        document.getElementById('attackSlider').value = attackTime;
+        document.getElementById('attackVal').innerText = `${attackTime}s`;
 
-            let px = w / 2 + x * 6;
-            let py = h - (z * 3.8) + 20;
+        releaseTime = cfg.release;
+        document.getElementById('releaseSlider').value = releaseTime;
+        document.getElementById('releaseVal').innerText = `${releaseTime}s`;
 
-            if (i === 0) lCtx.moveTo(px, py);
-            else lCtx.lineTo(px, py);
-        }
-        lCtx.stroke();
+        rhythmSpread = cfg.spread;
+        document.getElementById('spreadSlider').value = rhythmSpread;
+        document.getElementById('spreadVal').innerText = `${rhythmSpread}%`;
 
-        lx = x; ly = y; lz = z;
-        requestAnimationFrame(renderLorenz);
+        chordTonePull = cfg.pull;
+        document.getElementById('pullSlider').value = chordTonePull;
+        document.getElementById('pullVal').innerText = chordTonePull.toFixed(2);
+
+        document.getElementById('genreDisplay').innerText = genreKey;
+
+        if (isPlaying) { stopEngine(); startEngine(); }
     }
-    renderLorenz();
 
-    // --- PROBABILITY BAR CHART CANVAS ---
-    const pCanvas = document.getElementById('probCanvas');
-    const pCtx = pCanvas.getContext('2d');
-
-    function updateProbabilityCanvas() {
-        pCanvas.width = pCanvas.clientWidth;
-        const w = pCanvas.width;
-        const h = pCanvas.height;
-
-        pCtx.fillStyle = '#141c1a';
-        pCtx.fillRect(0, 0, w, h);
-
-        const bars = 12;
-        const barW = (w / bars) - 4;
-
-        for (let i = 0; i < bars; i++) {
-            let bh = Math.random() * (h * 0.8) * (1 / softmaxTemp);
-            if (i === 4) bh = h * 0.85; // Active peak
-            if (i === 7) bh = h * 0.55;
-
-            pCtx.fillStyle = (i === 4) ? '#e2a85c' : '#4cd9c0';
-            pCtx.fillRect(i * (barW + 4) + 4, h - bh, barW, bh);
-        }
-    }
-    updateProbabilityCanvas();
-
-    // --- MOOD CANVAS ANIMATION ---
-    const mCanvas = document.getElementById('moodCanvas');
-    const mCtx = mCanvas.getContext('2d');
-
-    function renderMood() {
-        mCanvas.width = mCanvas.clientWidth;
-        const w = mCanvas.width;
-        const h = mCanvas.height;
-
-        mCtx.fillStyle = '#141c1a';
-        mCtx.fillRect(0, 0, w, h);
-
-        mCtx.strokeStyle = 'rgba(226, 109, 109, 0.3)';
-        mCtx.beginPath();
-        mCtx.arc(w / 2, h / 2, 35, 0, Math.PI * 2);
-        mCtx.stroke();
-
-        mCtx.fillStyle = '#e26d6d';
-        mCtx.beginPath();
-        mCtx.arc(w / 2 + Math.sin(Date.now() * 0.002) * 25, h / 2 + Math.cos(Date.now() * 0.002) * 15, 4, 0, Math.PI * 2);
-        mCtx.fill();
-
-        requestAnimationFrame(renderMood);
-    }
-    renderMood();
-
-    // --- DOM EVENT LISTENERS ---
+    // --- EVENT LISTENERS ---
     document.getElementById('btnRun').addEventListener('click', () => {
-        if (isPlaying) stopEngine();
-        else startEngine();
+        if (isPlaying) stopEngine(); else startEngine();
     });
 
-    document.getElementById('rhoSlider').addEventListener('input', (e) => {
-        lorenzRho = parseFloat(e.target.value);
-        document.getElementById('rhoVal').innerText = lorenzRho.toFixed(1);
-        document.getElementById('pValDisp').innerText = lorenzRho.toFixed(1);
+    document.getElementById('genreButtons').addEventListener('click', (e) => {
+        const chip = e.target.closest('.genre-chip');
+        if (!chip) return;
+        document.querySelectorAll('.genre-chip').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        applyGenre(chip.dataset.genre);
     });
 
-    document.getElementById('tempSlider').addEventListener('input', (e) => {
-        softmaxTemp = parseFloat(e.target.value);
-        document.getElementById('tempVal').innerText = softmaxTemp.toFixed(2);
-        document.getElementById('tempDisp').innerText = softmaxTemp.toFixed(2);
+    document.getElementById('emotionButtons').addEventListener('click', (e) => {
+        const chip = e.target.closest('.emotion-chip');
+        if (!chip) return;
+        document.querySelectorAll('.emotion-chip').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        document.getElementById('feelingDisp').innerText = chip.dataset.feel;
+    });
+
+    document.getElementById('cutoffSlider').addEventListener('input', (e) => {
+        filterCutoff = parseFloat(e.target.value);
+        document.getElementById('cutoffVal').innerText = `${filterCutoff} Hz`;
+        if (mainFilter && audioCtx) mainFilter.frequency.setValueAtTime(filterCutoff, audioCtx.currentTime);
+    });
+
+    document.getElementById('attackSlider').addEventListener('input', (e) => {
+        attackTime = parseFloat(e.target.value);
+        document.getElementById('attackVal').innerText = `${attackTime}s`;
+    });
+
+    document.getElementById('releaseSlider').addEventListener('input', (e) => {
+        releaseTime = parseFloat(e.target.value);
+        document.getElementById('releaseVal').innerText = `${releaseTime}s`;
     });
 
     document.getElementById('tempoSlider').addEventListener('input', (e) => {
         tempo = parseInt(e.target.value);
-        document.getElementById('tempoVal').innerText = `${tempo}bpm`;
+        document.getElementById('tempoVal').innerText = `${tempo} bpm`;
         if (isPlaying) { stopEngine(); startEngine(); }
     });
 
     document.getElementById('pullSlider').addEventListener('input', (e) => {
         chordTonePull = parseFloat(e.target.value);
         document.getElementById('pullVal').innerText = chordTonePull.toFixed(2);
+    });
+
+    document.getElementById('rhoSlider').addEventListener('input', (e) => {
+        chaosRho = parseFloat(e.target.value);
+        document.getElementById('rhoVal').innerText = chaosRho.toFixed(1);
+    });
+
+    document.getElementById('spreadSlider').addEventListener('input', (e) => {
+        rhythmSpread = parseInt(e.target.value);
+        document.getElementById('spreadVal').innerText = `${rhythmSpread}%`;
+    });
+
+    document.getElementById('graceSlider').addEventListener('input', (e) => {
+        graceNoteChance = parseInt(e.target.value);
+        document.getElementById('graceVal').innerText = `${graceNoteChance}%`;
     });
 
     document.getElementById('toggleChords').addEventListener('click', function() {

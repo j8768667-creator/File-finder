@@ -178,7 +178,7 @@
                 </div>
 
                 <div class="info-card">
-                    Select the number of bars to generate. The engine will automatically complete the performance and download your <b>.mid</b> file!
+                    Exports a <b>Multitrack Standard MIDI File (Type 1)</b> with separate tracks for Lead, Chords, and Bass.
                 </div>
             </div>
         </div>
@@ -291,7 +291,7 @@
         osc.start(now);
         osc.stop(now + duration + releaseTime + 0.05);
 
-        // Record event for MIDI exporter
+        // Record event for Multitrack MIDI exporter
         if (isPlaying) {
             recordedEvents.push({
                 step: totalStepsPlayed,
@@ -348,19 +348,19 @@
             rootMidi + scale[(degree + 4) % numScale]
         ];
 
-        // 1. Chords
+        // 1. Chords Track
         if (chordsEnabled && (stepInBar === 0 || stepInBar === 8)) {
             chordPitches.forEach((pitch, i) => {
                 setTimeout(() => playTone(pitch, 'triangle', 1.2, 0.08, 'chords'), i * 15);
             });
         }
 
-        // 2. Bass
+        // 2. Bass Track
         if (bassEnabled && (stepInBar % 8 === 0)) {
             playTone(chordPitches[0] - 12, 'sawtooth', 0.8, 0.18, 'bass');
         }
 
-        // 3. Lead Line
+        // 3. Lead Track
         if (leadEnabled) {
             const isNoteStep = (stepInBar % 2 === 0);
             const isRestStep = (stepInBar === 6 || stepInBar === 14) && (Math.random() > 0.4);
@@ -439,7 +439,7 @@
         URL.revokeObjectURL(url);
     }
 
-    // ROBUST MULTITRACK MIDI EXPORTER (SMF Format 0 Binary)
+    // MULTITRACK MIDI EXPORTER (Standard MIDI File Type 1)
     function writeVLQ(value) {
         let buffer = [];
         let num = value;
@@ -450,37 +450,34 @@
         return buffer.reverse();
     }
 
-    function exportMidiFile() {
-        if (recordedEvents.length === 0) {
-            alert('No notes recorded! Run the engine to generate music first.');
-            return;
+    function buildMidiTrackChunk(trackName, channel, programNum, events, ticksPerStep, mpqn) {
+        let trackBytes = [];
+
+        // Track Name Meta Event
+        let nameBytes = Array.from(new TextEncoder().encode(trackName));
+        trackBytes.push(0x00, 0xFF, 0x03, nameBytes.length, ...nameBytes);
+
+        // Tempo Meta Event (only needed on Track 1 or Master)
+        if (mpqn) {
+            trackBytes.push(0x00, 0xFF, 0x51, 0x03, (mpqn >> 16) & 0xFF, (mpqn >> 8) & 0xFF, mpqn & 0xFF);
         }
 
-        const ticksPerQuarter = 480;
-        const ticksPerStep = ticksPerQuarter / 4; // 16th note steps
+        // Program Change (Instrument Assignment)
+        trackBytes.push(0x00, 0xC0 | channel, programNum & 0x7F);
 
-        // Flatten all note-on and note-off events
+        // Convert note events to delta time sorted array
         let rawEvents = [];
-        recordedEvents.forEach(e => {
+        events.forEach(e => {
             const startTick = e.step * ticksPerStep;
             const durationTicks = e.durationSteps * ticksPerStep;
-
-            const channel = (e.track === 'bass' ? 1 : (e.track === 'chords' ? 2 : 0));
 
             rawEvents.push({ tick: startTick, type: 0x90 | channel, pitch: e.pitch, vel: 0x64 });
             rawEvents.push({ tick: startTick + durationTicks, type: 0x80 | channel, pitch: e.pitch, vel: 0x00 });
         });
 
-        // Sort chronologically
         rawEvents.sort((a, b) => a.tick - b.tick);
 
-        let trackBytes = [];
         let lastTick = 0;
-
-        // Set Tempo Meta Event (Microseconds per Quarter Note)
-        const mpqn = Math.round(60000000 / tempo);
-        trackBytes.push(0x00, 0xFF, 0x51, 0x03, (mpqn >> 16) & 0xFF, (mpqn >> 8) & 0xFF, mpqn & 0xFF);
-
         rawEvents.forEach(ev => {
             const delta = Math.max(0, ev.tick - lastTick);
             lastTick = ev.tick;
@@ -492,29 +489,50 @@
         // End of Track Meta Event
         trackBytes.push(0x00, 0xFF, 0x2F, 0x00);
 
-        // Track Chunk Header
+        // Wrap with MTrk Header
         const trackLen = trackBytes.length;
-        const trackChunk = [
+        return [
             0x4D, 0x54, 0x72, 0x6B, // 'MTrk'
             (trackLen >> 24) & 0xFF, (trackLen >> 16) & 0xFF, (trackLen >> 8) & 0xFF, trackLen & 0xFF,
             ...trackBytes
         ];
+    }
 
-        // Header Chunk Format 0
+    function exportMidiFile() {
+        if (recordedEvents.length === 0) {
+            alert('No notes recorded! Run the engine to generate music first.');
+            return;
+        }
+
+        const ticksPerQuarter = 480;
+        const ticksPerStep = ticksPerQuarter / 4;
+        const mpqn = Math.round(60000000 / tempo);
+
+        // Filter events into separate track arrays
+        const leadEvents = recordedEvents.filter(e => e.track === 'lead');
+        const chordEvents = recordedEvents.filter(e => e.track === 'chords');
+        const bassEvents = recordedEvents.filter(e => e.track === 'bass');
+
+        // Build 3 Independent Tracks (Type 1 Multitrack)
+        const track1 = buildMidiTrackChunk('Lead Synth', 0, 80, leadEvents, ticksPerStep, mpqn);
+        const track2 = buildMidiTrackChunk('Chords Pad', 1, 89, chordEvents, ticksPerStep, null);
+        const track3 = buildMidiTrackChunk('Bass Synth', 2, 38, bassEvents, ticksPerStep, null);
+
+        // Format 1 Header (3 Tracks)
         const headerChunk = [
             0x4D, 0x54, 0x68, 0x64, // 'MThd'
-            0x00, 0x00, 0x00, 0x06, // Chunk length
-            0x00, 0x00,             // Format 0
-            0x00, 0x01,             // 1 Track
+            0x00, 0x00, 0x00, 0x06, // Length
+            0x00, 0x01,             // Type 1 Multitrack Format
+            0x00, 0x03,             // 3 Tracks
             (ticksPerQuarter >> 8) & 0xFF, ticksPerQuarter & 0xFF
         ];
 
-        const fullMidi = new Uint8Array([...headerChunk, ...trackChunk]);
+        const fullMidi = new Uint8Array([...headerChunk, ...track1, ...track2, ...track3]);
         const blob = new Blob([fullMidi], { type: 'audio/midi' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `generative_track_${Date.now()}.mid`;
+        a.download = `multitrack_composition_${Date.now()}.mid`;
         a.click();
         URL.revokeObjectURL(url);
     }

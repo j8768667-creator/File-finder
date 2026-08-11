@@ -13,7 +13,8 @@
             --input-bg: #b2b6b0;
             --text-dark: #222523;
             --text-dim: #525653;
-            --accent-orange: #b84a1d;
+            --accent-orange: #a84824;
+            --accent-red: #8f2b2b;
             --accent-green: #2d6a4f;
             --accent-purple: #3a2e59;
             --accent-teal: #1d7874;
@@ -23,12 +24,12 @@
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: var(--font-mono); user-select: none; }
         body { background-color: var(--bg-color); color: var(--text-dark); display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
 
-        .app-container { background-color: var(--container-bg); padding: 24px; border-radius: 6px; width: 100%; max-width: 1100px; box-shadow: 0 10px 30px rgba(0,0,0,0.25); }
+        .app-container { background-color: var(--container-bg); padding: 24px; border-radius: 6px; width: 100%; max-width: 1000px; box-shadow: 0 10px 30px rgba(0,0,0,0.25); }
 
         .top-bar { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
-        .btn-main { background-color: var(--accent-orange); color: #fff; border: none; padding: 18px; font-weight: bold; font-size: 15px; letter-spacing: 2px; border-radius: 4px; cursor: pointer; text-align: center; text-transform: uppercase; box-shadow: 0 3px 0 #873311; transition: all 0.1s; }
-        .btn-main:active { transform: translateY(2px); box-shadow: 0 1px 0 #873311; }
-        .btn-save { background-color: #8a2b2b; box-shadow: 0 3px 0 #5c1b1b; }
+        .btn-main { background-color: var(--accent-orange); color: #fff; border: none; padding: 18px; font-weight: bold; font-size: 14px; letter-spacing: 2px; border-radius: 4px; cursor: pointer; text-align: center; text-transform: uppercase; box-shadow: 0 3px 0 #732f15; transition: all 0.1s; }
+        .btn-main:active { transform: translateY(2px); box-shadow: 0 1px 0 #732f15; }
+        .btn-save { background-color: var(--accent-red); box-shadow: 0 3px 0 #5c1b1b; }
 
         .grid-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
         @media (max-width: 850px) { .grid-layout { grid-template-columns: 1fr; } }
@@ -68,7 +69,7 @@
 
 <div class="app-container">
     <div class="top-bar">
-        <button class="btn-main" id="btnRun">■ RUN ENGINE</button>
+        <button class="btn-main" id="btnRun">► RUN ENGINE</button>
         <button class="btn-main btn-save" id="btnSave">● STOP & SAVE</button>
     </div>
 
@@ -99,9 +100,9 @@
                 <div class="control-group">
                     <div class="control-label"><span>LEAD WAVEFORM</span></div>
                     <select id="leadWaveSelect">
-                        <option value="sine">Sine (Pure Warm Tone)</option>
+                        <option value="sine" selected>Sine (Pure Warm Tone)</option>
                         <option value="sawtooth">Sawtooth (Rich Lead)</option>
-                        <option value="triangle" selected>Triangle (Soft Warm Reed)</option>
+                        <option value="triangle">Triangle (Soft Flute/Reed)</option>
                         <option value="square">Square (Classic Pulse)</option>
                     </select>
                 </div>
@@ -182,18 +183,17 @@
 </div>
 
 <script>
-    // --- AUDIO SYSTEM & SYNTHESIS ENGINE ---
+    // --- AUDIO SYSTEM & POLISHED SYNTHESIS ENGINE ---
     let audioCtx = null;
     let masterGain = null;
+    let masterFilter = null;
     let masterCompressor = null;
-    let delayNode = null;
-    let delayFeedback = null;
 
     let isPlaying = false;
     let playTimer = null;
     let gridStep = 0;
 
-    // Controls Parameters
+    // Control Parameters
     let tempo = 124;
     let filterCutoff = 4479;
     let attackTime = 0.08;
@@ -204,10 +204,9 @@
     let chordsEnabled = true;
     let bassEnabled = true;
 
-    // Musical Engine Memory
-    let previousChordVoicing = [];
-    let lastMelodyPitch = 67; // G4
-    let lastLeapWasUp = false;
+    // Melody and Harmony Memory
+    let previousChord = [];
+    let currentMelodyPitchIndex = 2;
 
     const SCALES = {
         major: [0, 2, 4, 5, 7, 9, 11],
@@ -225,26 +224,19 @@
         if (!audioCtx) {
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-            // Master Limiter / Compressor prevents clipping distortion
             masterCompressor = audioCtx.createDynamicsCompressor();
-            masterCompressor.threshold.setValueAtTime(-6.0, audioCtx.currentTime);
-            masterCompressor.ratio.setValueAtTime(8.0, audioCtx.currentTime);
+            masterCompressor.threshold.setValueAtTime(-12.0, audioCtx.currentTime);
+            masterCompressor.ratio.setValueAtTime(6.0, audioCtx.currentTime);
 
             masterGain = audioCtx.createGain();
-            masterGain.gain.setValueAtTime(0.6, audioCtx.currentTime);
+            masterGain.gain.setValueAtTime(0.5, audioCtx.currentTime);
 
-            // Reverb / Delay feedback bus
-            delayNode = audioCtx.createDelay();
-            delayNode.delayTime.setValueAtTime(0.25, audioCtx.currentTime);
-            delayFeedback = audioCtx.createGain();
-            delayFeedback.gain.setValueAtTime(0.25, audioCtx.currentTime);
+            masterFilter = audioCtx.createBiquadFilter();
+            masterFilter.type = 'lowpass';
+            masterFilter.frequency.setValueAtTime(filterCutoff, audioCtx.currentTime);
 
-            delayNode.connect(delayFeedback);
-            delayFeedback.connect(delayNode);
-
-            masterGain.connect(masterCompressor);
-            masterGain.connect(delayNode);
-            delayNode.connect(masterCompressor);
+            masterGain.connect(masterFilter);
+            masterFilter.connect(masterCompressor);
             masterCompressor.connect(audioCtx.destination);
         }
 
@@ -253,114 +245,68 @@
         }
     }
 
-    // VOICE SYNTHESIZER WITH FILTER ENVELOPE FOR CLEAR TIMBRAL DIFFERENCES
+    // WARM POLISHED SOUND VOICE SYNTHESIZER
     function playTone(midiPitch, waveType, duration, volume, isLead = false) {
         if (!audioCtx) return;
         const now = audioCtx.currentTime;
 
-        const osc1 = audioCtx.createOscillator();
-        const osc2 = audioCtx.createOscillator();
+        const osc = audioCtx.createOscillator();
         const voiceFilter = audioCtx.createBiquadFilter();
         const voiceGain = audioCtx.createGain();
 
-        const freq = mtof(midiPitch);
-        osc1.type = waveType;
-        osc2.type = waveType;
+        osc.type = waveType;
+        osc.frequency.setValueAtTime(mtof(midiPitch), now);
 
-        osc1.frequency.setValueAtTime(freq, now);
-        // Slightly detuned second oscillator for warm analog timbre
-        const detuneAmt = (waveType === 'sawtooth') ? 8 : (waveType === 'square' ? 4 : 2);
-        osc2.frequency.setValueAtTime(freq * Math.pow(2, detuneAmt / 1200), now);
-
-        // Filter Envelope according to Waveform and Cutoff Control
+        // Sound Design Low-Pass Filter Envelope per note
         voiceFilter.type = 'lowpass';
-        let baseCutoff = filterCutoff;
+        let targetFilterCutoff = filterCutoff;
         
-        // Distinct timbral filter shaping per wave
-        if (waveType === 'sine') {
-            baseCutoff = Math.min(baseCutoff, 2200);
-        } else if (waveType === 'triangle') {
-            baseCutoff = Math.min(baseCutoff, 3200);
-        } else if (waveType === 'square') {
-            baseCutoff = Math.min(baseCutoff, 4500);
-        }
+        if (waveType === 'sine') targetFilterCutoff = Math.min(targetFilterCutoff, 2500);
+        else if (waveType === 'triangle') targetFilterCutoff = Math.min(targetFilterCutoff, 3500);
 
-        voiceFilter.frequency.setValueAtTime(baseCutoff * 0.4, now);
-        voiceFilter.frequency.exponentialRampToValueAtTime(Math.min(12000, baseCutoff * 1.8), now + attackTime);
-        voiceFilter.frequency.exponentialRampToValueAtTime(Math.max(200, baseCutoff * 0.5), now + duration + releaseTime);
+        voiceFilter.frequency.setValueAtTime(targetFilterCutoff * 0.5, now);
+        voiceFilter.frequency.exponentialRampToValueAtTime(Math.min(10000, targetFilterCutoff * 1.5), now + attackTime);
+        voiceFilter.frequency.exponentialRampToValueAtTime(Math.max(200, targetFilterCutoff * 0.4), now + duration + releaseTime);
 
-        // Amplitude ADSR Envelope
+        // Smooth ADSR Envelope
         voiceGain.gain.setValueAtTime(0.0001, now);
         voiceGain.gain.linearRampToValueAtTime(volume, now + attackTime);
-        voiceGain.gain.exponentialRampToValueAtTime(Math.max(0.0001, volume * 0.35), now + attackTime + 0.15);
+        voiceGain.gain.exponentialRampToValueAtTime(Math.max(0.0001, volume * 0.3), now + attackTime + 0.1);
         voiceGain.gain.exponentialRampToValueAtTime(0.0001, now + duration + releaseTime);
 
-        osc1.connect(voiceFilter);
-        osc2.connect(voiceFilter);
+        osc.connect(voiceFilter);
         voiceFilter.connect(voiceGain);
         voiceGain.connect(masterGain);
 
-        osc1.start(now);
-        osc2.start(now);
-        osc1.stop(now + duration + releaseTime + 0.05);
-        osc2.stop(now + duration + releaseTime + 0.05);
+        osc.start(now);
+        osc.stop(now + duration + releaseTime + 0.05);
     }
 
-    // VOICE LEADING LOGIC FOR SMOOTH CHORD SHIFTS
-    function applyVoiceLeading(targetPitches, prevPitches) {
-        if (!prevPitches || prevPitches.length === 0) return targetPitches;
-        return targetPitches.map((pitch, idx) => {
-            const anchor = prevPitches[idx] || prevPitches[0];
-            let best = pitch;
-            let minDist = Math.abs(pitch - anchor);
+    // MELODIC GENERATOR WITH STEADY RHYTHMIC PHRASING
+    function calculateMelodyPitch(rootMidi, scale, chordPitches) {
+        const scaleNotes = [];
+        // Expand 2 octaves
+        scale.forEach(step => scaleNotes.push(rootMidi + 12 + step));
+        scale.forEach(step => scaleNotes.push(rootMidi + 24 + step));
 
-            for (let shift = -24; shift <= 24; shift += 12) {
-                let cand = pitch + shift;
-                let dist = Math.abs(cand - anchor);
-                if (dist < minDist) {
-                    minDist = dist;
-                    best = cand;
-                }
-            }
-            return best;
-        }).sort((a, b) => a - b);
+        // Chaos influence probability
+        const chaosFactor = (chaosRho - 10) / 40; // Normalize 0 to 1
+
+        let stepChange = 0;
+        const rand = Math.random();
+
+        if (rand < 0.4) stepChange = 1;      // Step up
+        else if (rand < 0.8) stepChange = -1; // Step down
+        else stepChange = (Math.random() < 0.5 ? 2 : -2) * (chaosFactor > 0.5 ? 2 : 1); // Jump
+
+        currentMelodyPitchIndex = Math.max(0, Math.min(scaleNotes.length - 1, currentMelodyPitchIndex + stepChange));
+        
+        return scaleNotes[currentMelodyPitchIndex];
     }
 
-    // MELODIC GENERATION BASED ON CHAOS & PHRASING
-    function calculateMelodyNote(rootMidi, scale, currentChord) {
-        let nextPitch = lastMelodyPitch;
-
-        if (lastLeapWasUp) {
-            nextPitch -= (Math.random() < 0.75 ? 2 : 1);
-            lastLeapWasUp = false;
-        } else {
-            if (Math.random() < (chaosRho / 100)) {
-                nextPitch += (Math.random() < 0.5 ? 4 : 7);
-                lastLeapWasUp = true;
-            } else {
-                nextPitch += (Math.random() < 0.5 ? 2 : -2);
-            }
-        }
-
-        // Keep melody in a comfortable expressive range
-        if (nextPitch < rootMidi + 5) nextPitch += 7;
-        if (nextPitch > rootMidi + 24) nextPitch -= 7;
-
-        // Chord tone pull on downbeats
-        if (gridStep % 4 === 0) {
-            const upperChord = currentChord.map(p => p + 12);
-            nextPitch = upperChord.reduce((prev, curr) => 
-                Math.abs(curr - nextPitch) < Math.abs(prev - nextPitch) ? curr : prev
-            );
-        }
-
-        lastMelodyPitch = nextPitch;
-        return nextPitch;
-    }
-
-    // MAIN TIMING TICK
+    // TICK RHYTHM ENGINE
     function tick() {
-        const rootMidi = parseInt(document.getElementById('rootSelect').value) + 48; // C3
+        const rootMidi = parseInt(document.getElementById('rootSelect').value) + 48; // Base octave (C3=48, G3=55)
         const scaleType = document.getElementById('scaleSelect').value;
         const scale = SCALES[scaleType] || SCALES.minor;
 
@@ -368,39 +314,35 @@
         const barIdx = Math.floor(gridStep / 16) % activeProgression.length;
         const degree = activeProgression[barIdx];
 
-        // Voiced Chord
+        // Calculated Chord
         const numScale = scale.length;
-        const rawChord = [
+        const chordPitches = [
             rootMidi + scale[degree % numScale],
             rootMidi + scale[(degree + 2) % numScale],
             rootMidi + scale[(degree + 4) % numScale]
         ];
-        const voicedChord = applyVoiceLeading(rawChord, previousChordVoicing);
-        previousChordVoicing = voicedChord;
 
-        // 1. Play Chords
-        if (chordsEnabled && (stepInBar === 0 || stepInBar === 6 || stepInBar === 10)) {
-            const wave = document.getElementById('leadWaveSelect').value;
-            const chordWave = (wave === 'sawtooth') ? 'sawtooth' : 'triangle';
-            voicedChord.forEach((p, i) => {
-                setTimeout(() => playTone(p, chordWave, 0.6, 0.10), i * 20);
+        // 1. Play Chords (Sustained quarter notes)
+        if (chordsEnabled && (stepInBar === 0 || stepInBar === 8)) {
+            chordPitches.forEach((pitch, i) => {
+                setTimeout(() => playTone(pitch, 'triangle', 1.2, 0.08), i * 15);
             });
         }
 
-        // 2. Play Bass
-        if (bassEnabled && (stepInBar % 4 === 0)) {
-            playTone(voicedChord[0] - 12, 'sawtooth', 0.35, 0.22);
+        // 2. Play Bass (Steady pulse on beat 1 and 3)
+        if (bassEnabled && (stepInBar % 8 === 0)) {
+            playTone(chordPitches[0] - 12, 'sawtooth', 0.8, 0.18);
         }
 
-        // 3. Play Lead Melody with Phrasing Rhythms
+        // 3. Play Lead Line (Musically phrased eighth-note rhythm with rests)
         if (leadEnabled) {
-            const isNoteStep = (stepInBar % 2 === 0) || (stepInBar % 3 === 0 && Math.random() < 0.5);
-            const isRestStep = (stepInBar === 14 && Math.random() < 0.6); // Occasional breath/rest
+            const isNoteStep = (stepInBar % 2 === 0);
+            const isRestStep = (stepInBar === 6 || stepInBar === 14) && (Math.random() > 0.4);
 
             if (isNoteStep && !isRestStep) {
                 const wave = document.getElementById('leadWaveSelect').value;
-                const melPitch = calculateMelodyNote(rootMidi + 12, scale, voicedChord);
-                playTone(melPitch, wave, 0.3, 0.18, true);
+                const leadPitch = calculateMelodyPitch(rootMidi, scale, chordPitches);
+                playTone(leadPitch, wave, 0.4, 0.14, true);
             }
         }
 
@@ -412,7 +354,7 @@
         isPlaying = true;
         document.getElementById('btnRun').innerText = '■ STOP ENGINE';
 
-        const stepInterval = (60 / tempo) * 1000 / 4;
+        const stepInterval = (60 / tempo) * 1000 / 4; // 16th note steps
         playTimer = setInterval(tick, stepInterval);
     }
 
@@ -426,7 +368,7 @@
     const GENRES = {
         JAZZ: { tempo: 118, scale: 'dorian', wave: 'triangle', cutoff: 2800, attack: 0.05, release: 1.2, rho: 30.0, prog: [0, 1, 4, 0] },
         LOFI: { tempo: 80, scale: 'minor', wave: 'sine', cutoff: 1800, attack: 0.1, release: 1.8, rho: 20.0, prog: [0, 3, 5, 4] },
-        SYNTHWAVE: { tempo: 124, scale: 'minor', wave: 'triangle', cutoff: 4479, attack: 0.08, release: 1.5, rho: 45.4, prog: [0, 5, 3, 4] },
+        SYNTHWAVE: { tempo: 124, scale: 'minor', wave: 'sine', cutoff: 4479, attack: 0.08, release: 1.5, rho: 45.4, prog: [0, 5, 3, 4] },
         CLASSICAL: { tempo: 92, scale: 'major', wave: 'triangle', cutoff: 3500, attack: 0.06, release: 2.0, rho: 25.0, prog: [0, 3, 4, 0] },
         AMBIENT: { tempo: 68, scale: 'pentatonic', wave: 'sine', cutoff: 1200, attack: 0.3, release: 2.8, rho: 15.0, prog: [0, 4, 3, 0] },
         FUNK: { tempo: 115, scale: 'mixolydian', wave: 'square', cutoff: 5200, attack: 0.01, release: 0.6, rho: 40.0, prog: [0, 3, 0, 4] },
@@ -450,6 +392,7 @@
         filterCutoff = cfg.cutoff;
         document.getElementById('cutoffSlider').value = filterCutoff;
         document.getElementById('cutoffVal').innerText = `${filterCutoff}Hz`;
+        if (masterFilter && audioCtx) masterFilter.frequency.setValueAtTime(filterCutoff, audioCtx.currentTime);
 
         attackTime = cfg.attack;
         document.getElementById('attackSlider').value = attackTime;
@@ -469,7 +412,7 @@
         if (isPlaying) { stopEngine(); startEngine(); }
     }
 
-    // --- DOM LISTENERS ---
+    // --- DOM EVENT LISTENERS ---
     document.getElementById('btnRun').addEventListener('click', () => {
         if (isPlaying) stopEngine(); else startEngine();
     });
@@ -494,6 +437,7 @@
     document.getElementById('cutoffSlider').addEventListener('input', (e) => {
         filterCutoff = parseFloat(e.target.value);
         document.getElementById('cutoffVal').innerText = `${filterCutoff}Hz`;
+        if (masterFilter && audioCtx) masterFilter.frequency.setValueAtTime(filterCutoff, audioCtx.currentTime);
     });
 
     document.getElementById('attackSlider').addEventListener('input', (e) => {

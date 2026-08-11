@@ -3,150 +3,131 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Generative Music Studio — Functional Movement & Synthesis</title>
+    <title>Generative Music Studio</title>
     <style>
         :root {
-            --bg-color: #121816;
-            --panel-bg: #1a2220;
-            --panel-border: #2a3632;
-            --input-bg: #141c1a;
-            --text-main: #d1deda;
-            --text-dim: #708a83;
-            --accent-cyan: #4cd9c0;
-            --accent-amber: #e2a85c;
-            --accent-rose: #e26d6d;
-            --accent-purple: #9b72cf;
-            --font-mono: 'Fira Code', 'Courier New', monospace;
+            --bg-color: #8c8c88;
+            --container-bg: #80807c;
+            --panel-bg: #c0c4be;
+            --panel-border: #a8aca6;
+            --input-bg: #b2b6b0;
+            --text-dark: #222523;
+            --text-dim: #525653;
+            --accent-orange: #b84a1d;
+            --accent-green: #2d6a4f;
+            --accent-purple: #3a2e59;
+            --accent-teal: #1d7874;
+            --font-mono: 'Courier New', Courier, monospace;
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: var(--font-mono); user-select: none; }
-        body { background-color: var(--bg-color); color: var(--text-main); display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; padding: 24px; }
+        body { background-color: var(--bg-color); color: var(--text-dark); display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
 
-        .dashboard { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; width: 100%; max-width: 1100px; }
-        @media (max-width: 850px) { .dashboard { grid-template-columns: 1fr; } }
+        .app-container { background-color: var(--container-bg); padding: 24px; border-radius: 6px; width: 100%; max-width: 1100px; box-shadow: 0 10px 30px rgba(0,0,0,0.25); }
 
-        .column { display: flex; flex-direction: column; gap: 20px; }
-        .panel { background-color: var(--panel-bg); border: 1px solid var(--panel-border); border-radius: 8px; padding: 18px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
-        .panel-header { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); margin-bottom: 14px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
+        .top-bar { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+        .btn-main { background-color: var(--accent-orange); color: #fff; border: none; padding: 18px; font-weight: bold; font-size: 15px; letter-spacing: 2px; border-radius: 4px; cursor: pointer; text-align: center; text-transform: uppercase; box-shadow: 0 3px 0 #873311; transition: all 0.1s; }
+        .btn-main:active { transform: translateY(2px); box-shadow: 0 1px 0 #873311; }
+        .btn-save { background-color: #8a2b2b; box-shadow: 0 3px 0 #5c1b1b; }
 
-        .header-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-        .btn { background-color: var(--accent-cyan); color: #121816; border: none; padding: 14px; font-weight: bold; font-size: 13px; letter-spacing: 1px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s; }
-        .btn:hover { filter: brightness(1.1); }
-        .btn-run.active { background-color: var(--accent-amber); color: #121816; }
-        .btn-rec { background-color: var(--input-bg); color: var(--accent-rose); border: 1px solid rgba(226, 109, 109, 0.4); }
-        .btn-rec.recording { background-color: var(--accent-rose); color: #fff; animation: pulse 1.5s infinite; }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
+        .grid-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        @media (max-width: 850px) { .grid-layout { grid-template-columns: 1fr; } }
+
+        .panel { background-color: var(--panel-bg); border: 1px solid var(--panel-border); border-radius: 6px; padding: 18px; margin-bottom: 20px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.4); }
+        .panel-header { font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-dim); margin-bottom: 14px; font-weight: bold; display: flex; justify-content: space-between; }
+
+        .genre-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+        .genre-chip { background-color: var(--input-bg); border: 1px solid var(--panel-border); color: var(--text-dim); padding: 10px 2px; font-size: 10px; border-radius: 4px; cursor: pointer; text-align: center; font-weight: bold; }
+        .genre-chip.active { background-color: #b5b9c0; border-color: var(--accent-purple); color: var(--accent-purple); box-shadow: inset 0 0 4px rgba(0,0,0,0.15); }
 
         .control-group { margin-bottom: 14px; }
-        .control-label { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-dim); margin-bottom: 6px; text-transform: uppercase; }
-        .select-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        select, input[type="range"] { width: 100%; background-color: var(--input-bg); border: 1px solid var(--panel-border); color: var(--text-main); padding: 9px 10px; border-radius: 6px; font-family: inherit; outline: none; }
-        input[type="range"] { -webkit-appearance: none; height: 4px; border: none; margin-top: 6px; }
-        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: var(--accent-cyan); cursor: pointer; }
+        .control-label { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-dim); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 1px; }
+        .select-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
-        .slider-val { color: var(--accent-amber); font-weight: bold; font-size: 11px; }
+        select, input[type="range"] { width: 100%; background-color: var(--input-bg); border: 1px solid var(--panel-border); color: var(--text-dark); padding: 8px 10px; border-radius: 4px; font-family: inherit; outline: none; font-weight: bold; }
+        input[type="range"] { -webkit-appearance: none; height: 6px; border: none; margin-top: 8px; }
+        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: var(--accent-teal); cursor: pointer; }
 
-        .toggle-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .toggle-btn { background-color: var(--input-bg); border: 1px solid var(--panel-border); color: var(--text-dim); padding: 10px; font-size: 11px; border-radius: 6px; text-align: center; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: bold; }
-        .toggle-btn.active { border-color: var(--accent-cyan); color: var(--accent-cyan); background-color: rgba(76, 217, 192, 0.1); }
-        .indicator { width: 6px; height: 6px; border-radius: 50%; background-color: var(--accent-cyan); }
+        .val-disp { color: var(--accent-orange); font-weight: bold; font-size: 11px; }
 
-        .genre-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
-        .genre-chip { background-color: var(--input-bg); border: 1px solid var(--panel-border); color: var(--text-dim); padding: 9px 4px; font-size: 10px; border-radius: 6px; cursor: pointer; text-align: center; font-weight: bold; transition: all 0.15s; }
-        .genre-chip:hover { border-color: var(--accent-purple); }
-        .genre-chip.active { border-color: var(--accent-purple); color: #fff; background-color: var(--accent-purple); }
+        .toggle-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 10px; }
+        .toggle-btn { background-color: var(--input-bg); border: 1px solid var(--panel-border); color: var(--text-dim); padding: 10px; font-size: 10px; border-radius: 4px; text-align: center; cursor: pointer; font-weight: bold; display: flex; align-items: center; justify-content: center; gap: 6px; }
+        .toggle-btn.active { background-color: #cce3de; border-color: var(--accent-green); color: var(--accent-green); }
+        .indicator { width: 6px; height: 6px; border-radius: 50%; background-color: var(--accent-green); }
 
-        .emotion-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
-        .emotion-chip { background-color: var(--input-bg); border: 1px solid var(--panel-border); color: var(--text-dim); padding: 8px 2px; font-size: 9px; border-radius: 4px; text-align: center; cursor: pointer; text-transform: uppercase; font-weight: bold; transition: all 0.15s; }
-        .emotion-chip:hover { border-color: var(--accent-rose); }
-        .emotion-chip.active { border-color: var(--accent-rose); color: #fff; background-color: var(--accent-rose); }
+        .info-card { font-size: 11px; line-height: 1.5; color: var(--text-dim); background-color: var(--input-bg); border: 1px solid var(--panel-border); padding: 12px; border-radius: 4px; }
 
-        .status-card { font-size: 11px; line-height: 1.5; color: var(--text-dim); background-color: var(--input-bg); border: 1px solid var(--panel-border); padding: 12px; border-radius: 6px; display: flex; justify-content: space-between; }
-        .status-val { color: var(--accent-cyan); font-weight: bold; }
+        /* Modal Popup */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.4); display: none; justify-content: center; align-items: center; z-index: 1000; }
+        .modal-card { background: #e8eae6; padding: 30px; border-radius: 12px; max-width: 420px; width: 90%; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.3); }
+        .modal-card p { font-size: 14px; margin-bottom: 20px; color: var(--text-dark); line-height: 1.4; }
+        .modal-btn { background: none; border: none; color: #007aff; font-weight: bold; font-size: 16px; cursor: pointer; }
     </style>
 </head>
 <body>
 
-<div class="dashboard">
-    <div class="column">
-        <div class="header-actions">
-            <button class="btn btn-run" id="btnRun">► RUN ENGINE</button>
-            <button class="btn btn-rec" id="btnRec"><span style="color:var(--accent-rose)">●</span> REC MIDI</button>
-        </div>
+<div class="app-container">
+    <div class="top-bar">
+        <button class="btn-main" id="btnRun">■ RUN ENGINE</button>
+        <button class="btn-main btn-save" id="btnSave">● STOP & SAVE</button>
+    </div>
 
-        <div class="status-card">
-            <span>NOW PLAYING CHORD: <span class="status-val" id="currentChordDisp">G Major</span></span>
-            <span>NOTES GENERATED: <span class="status-val" id="noteCount">0</span></span>
-        </div>
-
-        <div class="panel">
-            <div class="panel-header">GENRE PRESETS — ACTIVE: <span style="color: var(--accent-purple)" id="genreDisplay">SYNTHWAVE</span></div>
-            <div class="genre-grid" id="genreButtons">
-                <div class="genre-chip" data-genre="JAZZ">JAZZ</div>
-                <div class="genre-chip" data-genre="LOFI">LO-FI</div>
-                <div class="genre-chip active" data-genre="SYNTHWAVE">SYNTHWAVE</div>
-                <div class="genre-chip" data-genre="CLASSICAL">CLASSICAL</div>
-                <div class="genre-chip" data-genre="AMBIENT">AMBIENT</div>
-                <div class="genre-chip" data-genre="FUNK">FUNK</div>
-                <div class="genre-chip" data-genre="ROCK">ROCK</div>
-                <div class="genre-chip" data-genre="BLUES">BLUES</div>
-                <div class="genre-chip" data-genre="POP">POP</div>
-                <div class="genre-chip" data-genre="EDM">EDM</div>
-            </div>
-        </div>
-
-        <div class="panel">
-            <div class="panel-header">MOOD / EMOTION: <span id="feelingDisp" style="color: var(--accent-rose)">JOYFUL</span></div>
-            <div class="emotion-grid" id="emotionButtons">
-                <div class="emotion-chip" data-feel="DRIFT">DRIFT</div>
-                <div class="emotion-chip" data-feel="SERENE">SERENE</div>
-                <div class="emotion-chip active" data-feel="JOYFUL">JOYFUL</div>
-                <div class="emotion-chip" data-feel="EPIC">EPIC</div>
-                <div class="emotion-chip" data-feel="MELANCHOLY">MELANCHOLY</div>
-                <div class="emotion-chip" data-feel="TENSE">TENSE</div>
-            </div>
-        </div>
-
-        <div class="panel">
-            <div class="panel-header">SOUND DESIGN SYNTH CONTROLS</div>
-            
-            <div class="control-group">
-                <div class="control-label"><span>LEAD WAVEFORM</span></div>
-                <select id="leadWaveSelect">
-                    <option value="sawtooth" selected>Sawtooth (Rich Detuned Lead)</option>
-                    <option value="square">Square (8-Bit Pulse)</option>
-                    <option value="triangle">Triangle (Flute / Warm Reed)</option>
-                    <option value="sine">Sine (Pure Warm Tone)</option>
-                </select>
+    <div class="grid-layout">
+        <div>
+            <div class="panel">
+                <div class="panel-header">
+                    <span>GENRE PRESETS — ACTIVE:</span>
+                    <span style="color: var(--accent-purple)" id="genreDisplay">SYNTHWAVE</span>
+                </div>
+                <div class="genre-grid" id="genreGrid">
+                    <div class="genre-chip" data-genre="JAZZ">JAZZ</div>
+                    <div class="genre-chip" data-genre="LOFI">LO-FI</div>
+                    <div class="genre-chip active" data-genre="SYNTHWAVE">SYNTHWAVE</div>
+                    <div class="genre-chip" data-genre="CLASSICAL">CLASSICAL</div>
+                    <div class="genre-chip" data-genre="AMBIENT">AMBIENT</div>
+                    <div class="genre-chip" data-genre="FUNK">FUNK</div>
+                    <div class="genre-chip" data-genre="ROCK">ROCK</div>
+                    <div class="genre-chip" data-genre="BLUES">BLUES</div>
+                    <div class="genre-chip" data-genre="POP">POP</div>
+                    <div class="genre-chip" data-genre="EDM">EDM</div>
+                </div>
             </div>
 
-            <div class="control-group">
-                <div class="control-label"><span>FILTER CUTOFF FREQUENCY</span><span id="cutoffVal" class="slider-val">3500 Hz</span></div>
-                <input type="range" id="cutoffSlider" min="200" max="10000" step="50" value="3500">
-            </div>
+            <div class="panel">
+                <div class="panel-header">SOUND DESIGN SYNTH CONTROLS</div>
+                
+                <div class="control-group">
+                    <div class="control-label"><span>LEAD WAVEFORM</span></div>
+                    <select id="leadWaveSelect">
+                        <option value="sine" selected>Sine (Pure Warm Tone)</option>
+                        <option value="sawtooth">Sawtooth (Rich Brass Lead)</option>
+                        <option value="triangle">Triangle (Soft Flute/Reed)</option>
+                        <option value="square">Square (Warm Pulse)</option>
+                    </select>
+                </div>
 
-            <div class="control-group">
-                <div class="select-row">
-                    <div>
-                        <div class="control-label"><span>ATTACK TIME</span><span id="attackVal" class="slider-val">0.02s</span></div>
-                        <input type="range" id="attackSlider" min="0.005" max="0.5" step="0.005" value="0.02">
-                    </div>
-                    <div>
-                        <div class="control-label"><span>RELEASE TIME</span><span id="releaseVal" class="slider-val">0.40s</span></div>
-                        <input type="range" id="releaseSlider" min="0.05" max="2.0" step="0.05" value="0.40">
-                    </div>
+                <div class="control-group">
+                    <div class="control-label"><span>FILTER CUTOFF FREQUENCY</span><span class="val-disp" id="cutoffVal">4479Hz</span></div>
+                    <input type="range" id="cutoffSlider" min="300" max="8000" step="50" value="4479">
+                </div>
+
+                <div class="control-group">
+                    <div class="control-label"><span>ATTACK TIME</span><span class="val-disp" id="attackVal">0.08s</span></div>
+                    <input type="range" id="attackSlider" min="0.01" max="0.5" step="0.01" value="0.08">
+                </div>
+
+                <div class="control-group">
+                    <div class="control-label"><span>RELEASE TIME</span><span class="val-disp" id="releaseVal">1.5s</span></div>
+                    <input type="range" id="releaseSlider" min="0.1" max="3.0" step="0.1" value="1.5">
                 </div>
             </div>
         </div>
-    </div>
 
-    <div class="column">
-        <div class="panel">
-            <div class="panel-header">MUSIC THEORY & SCALES</div>
-            <div class="control-group">
-                <div class="select-row">
-                    <div>
-                        <div class="control-label"><span>KEY ROOT</span></div>
+        <div>
+            <div class="panel">
+                <div class="panel-header">MUSIC THEORY & SCALES</div>
+                <div class="control-group">
+                    <div class="select-row">
                         <select id="rootSelect">
                             <option value="0">C</option>
                             <option value="2">D</option>
@@ -156,75 +137,52 @@
                             <option value="9">A</option>
                             <option value="11">B</option>
                         </select>
-                    </div>
-                    <div>
-                        <div class="control-label"><span>SCALE MODE</span></div>
                         <select id="scaleSelect">
-                            <option value="major" selected>Major</option>
-                            <option value="minor">Minor</option>
+                            <option value="major">Major</option>
+                            <option value="minor" selected>Minor</option>
                             <option value="dorian">Dorian</option>
                             <option value="mixolydian">Mixolydian</option>
                             <option value="pentatonic">Pentatonic</option>
                         </select>
                     </div>
                 </div>
+
+                <div class="control-group">
+                    <div class="control-label"><span>TEMPO</span><span class="val-disp" id="tempoVal">124bpm</span></div>
+                    <input type="range" id="tempoSlider" min="60" max="180" value="124">
+                </div>
+
+                <div class="toggle-row">
+                    <div class="toggle-btn active" id="toggleLead"><div class="indicator"></div> Lead Track</div>
+                    <div class="toggle-btn active" id="toggleChords"><div class="indicator"></div> Chords Track</div>
+                    <div class="toggle-btn active" id="toggleBass"><div class="indicator"></div> Bass Track</div>
+                </div>
             </div>
 
-            <div class="control-group">
-                <div class="control-label"><span>TEMPO</span><span id="tempoVal" class="slider-val">112 bpm</span></div>
-                <input type="range" id="tempoSlider" min="60" max="180" value="112">
-            </div>
-        </div>
+            <div class="panel">
+                <div class="panel-header">CHAOS & HARMONIC VARIATION</div>
+                <div class="control-group">
+                    <div class="control-label"><span>P (LORENZ CHAOS PARAMETER)</span><span class="val-disp" id="rhoVal">45.4</span></div>
+                    <input type="range" id="rhoSlider" min="10.0" max="50.0" step="0.1" value="45.4">
+                </div>
 
-        <div class="panel">
-            <div class="panel-header">MIXER & HARMONY</div>
-            <div class="toggle-row" style="margin-bottom: 12px;">
-                <div class="toggle-btn active" id="toggleChords"><div class="indicator"></div> Chords</div>
-                <div class="toggle-btn active" id="toggleBass"><div class="indicator"></div> Bass</div>
-            </div>
-
-            <div class="control-group">
-                <div class="control-label"><span>CHORD-TONE PULL ON MELODY</span><span id="pullVal" class="slider-val">0.70</span></div>
-                <input type="range" id="pullSlider" min="0.0" max="1.0" step="0.05" value="0.70">
-            </div>
-
-            <div class="control-group">
-                <div class="control-label"><span>ACCOMPANIMENT STYLE</span></div>
-                <select id="styleSelect">
-                    <option value="groove" selected>Syncopated Grooves</option>
-                    <option value="arpeggiated">Arpeggiated Cascade</option>
-                    <option value="stride">Stride Rhythm Stabs</option>
-                    <option value="pad">Sustained Warm Pads</option>
-                </select>
-            </div>
-        </div>
-
-        <div class="panel">
-            <div class="panel-header">CHAOS & EXPRESSION PARAMETERS</div>
-            
-            <div class="control-group">
-                <div class="control-label"><span>P (LORENZ CHAOS PARAMETER)</span><span id="rhoVal" class="slider-val">28.0</span></div>
-                <input type="range" id="rhoSlider" min="10.0" max="50.0" step="0.1" value="28.0">
-            </div>
-
-            <div class="control-group">
-                <div class="select-row">
-                    <div>
-                        <div class="control-label"><span>RHYTHM SPREAD</span><span id="spreadVal" class="slider-val">60%</span></div>
-                        <input type="range" id="spreadSlider" min="0" max="100" value="60">
-                    </div>
-                    <div>
-                        <div class="control-label"><span>GRACE NOTES</span><span id="graceVal" class="slider-val">15%</span></div>
-                        <input type="range" id="graceSlider" min="0" max="50" value="15">
-                    </div>
+                <div class="info-card">
+                    Press <b>REC MIDI</b> while running to capture lead, chord, and bass lines. Click <b>STOP & SAVE</b> to download the multitrack .mid file for your DAW.
                 </div>
             </div>
         </div>
     </div>
 </div>
 
+<div class="modal-overlay" id="modalOverlay">
+    <div class="modal-card">
+        <p id="modalMsg">MIDI Exporter is loading, please try again in a moment.</p>
+        <button class="modal-btn" id="modalClose">Close</button>
+    </div>
+</div>
+
 <script>
-    // --- SYNTHESIS & AUDIO BUS STATE ---
+    // --- AUDIO SYSTEM & POLISHED SYNTHESIS ENGINE ---
     let audioCtx = null;
     let masterGain = null;
     let masterLimiter = null;
@@ -235,21 +193,19 @@
     let isPlaying = false;
     let playTimer = null;
     let gridStep = 0;
-    let totalNotes = 0;
 
-    // Controls State
-    let tempo = 112;
-    let filterCutoff = 3500;
-    let attackTime = 0.02;
-    let releaseTime = 0.40;
-    let chordTonePull = 0.70;
-    let chaosRho = 28.0;
-    let rhythmSpread = 60;
-    let graceNoteChance = 15;
+    // Active Parameters
+    let tempo = 124;
+    let filterCutoff = 4479;
+    let attackTime = 0.08;
+    let releaseTime = 1.5;
+    let chaosRho = 45.4;
+
+    let leadEnabled = true;
     let chordsEnabled = true;
     let bassEnabled = true;
 
-    // Movement Engine
+    // Movement History
     let previousChordVoicing = [];
     let lastMelodyPitch = 67; // G4
     let lastLeapWasUp = false;
@@ -261,42 +217,36 @@
         mixolydian: [0, 2, 4, 5, 7, 9, 10],
         pentatonic: [0, 2, 4, 7, 9]
     };
-
-    const PROGRESSIONS = [
-        [0, 4, 5, 3], // I - V - vi - IV
-        [0, 5, 3, 4], // I - vi - IV - V
-        [5, 3, 0, 4]  // vi - IV - I - V
-    ];
-    let currentProgression = PROGRESSIONS[0];
+    const PROGRESSION_DEGREES = [0, 5, 3, 4]; // i - VI - IV - V
 
     function mtof(midi) { return 440 * Math.pow(2, (midi - 69) / 12); }
 
-    // --- AUDIO SYSTEM INITIALIZATION ---
+    // INITIALIZE WEB AUDIO CONTEXT
     function initAudio() {
         if (!audioCtx) {
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
+            // Dynamics Limiter prevents bass clipping (fixes Sound.wav rumble)
             masterLimiter = audioCtx.createDynamicsCompressor();
-            masterLimiter.threshold.setValueAtTime(-4.0, audioCtx.currentTime);
+            masterLimiter.threshold.setValueAtTime(-3.0, audioCtx.currentTime);
             masterLimiter.ratio.setValueAtTime(12.0, audioCtx.currentTime);
 
             masterGain = audioCtx.createGain();
-            masterGain.gain.setValueAtTime(0.7, audioCtx.currentTime);
+            masterGain.gain.setValueAtTime(0.65, audioCtx.currentTime);
 
             mainFilter = audioCtx.createBiquadFilter();
             mainFilter.type = 'lowpass';
             mainFilter.frequency.setValueAtTime(filterCutoff, audioCtx.currentTime);
 
-            // Delay effect bus
+            // Reverb / Delay feedback bus
             delayNode = audioCtx.createDelay();
-            delayNode.delayTime.setValueAtTime(0.25, audioCtx.currentTime); // Dotted 8th-like delay
+            delayNode.delayTime.setValueAtTime(0.24, audioCtx.currentTime);
             delayFeedback = audioCtx.createGain();
-            delayFeedback.gain.setValueAtTime(0.25, audioCtx.currentTime);
+            delayFeedback.gain.setValueAtTime(0.2, audioCtx.currentTime);
 
             delayNode.connect(delayFeedback);
             delayFeedback.connect(delayNode);
 
-            // Routing
             masterGain.connect(mainFilter);
             mainFilter.connect(masterLimiter);
             mainFilter.connect(delayNode);
@@ -309,14 +259,13 @@
         }
     }
 
-    // --- RICH DUAL-OSCILLATOR SYNTHESIS ENGINE ---
-    function playTone(midiPitch, wave, duration, gainLevel, isMelody = false) {
+    // WARM EXPRESSIVE VOICE SYNTHESIS
+    function playTone(midiPitch, wave, duration, gainLevel, isLead = false) {
         if (!audioCtx) return;
         const now = audioCtx.currentTime;
 
-        // Primary Oscillator
         const osc1 = audioCtx.createOscillator();
-        const osc2 = audioCtx.createOscillator(); // Detuned 2nd Osc for warmth
+        const osc2 = audioCtx.createOscillator();
         const noteGain = audioCtx.createGain();
 
         const freq = mtof(midiPitch);
@@ -324,13 +273,13 @@
         osc2.type = wave;
 
         osc1.frequency.setValueAtTime(freq, now);
-        // Subtle 7-cent detune on second osc for rich musical timbre
-        osc2.frequency.setValueAtTime(freq * Math.pow(2, 7 / 1200), now);
+        // Detuned second oscillator adds spatial width and warmth
+        osc2.frequency.setValueAtTime(freq * Math.pow(2, 6 / 1200), now);
 
-        // Attack & Release Envelope
+        // Envelope Generator
         noteGain.gain.setValueAtTime(0.0001, now);
         noteGain.gain.linearRampToValueAtTime(gainLevel, now + attackTime);
-        noteGain.gain.exponentialRampToValueAtTime(Math.max(0.0001, gainLevel * 0.3), now + attackTime + 0.1);
+        noteGain.gain.exponentialRampToValueAtTime(Math.max(0.0001, gainLevel * 0.35), now + attackTime + 0.1);
         noteGain.gain.exponentialRampToValueAtTime(0.0001, now + duration + releaseTime);
 
         osc1.connect(noteGain);
@@ -343,7 +292,7 @@
         osc2.stop(now + duration + releaseTime + 0.05);
     }
 
-    // --- HARMONY & MOVEMENT LOGIC ---
+    // HARMONIC VOICE LEADING
     function applyVoiceLeading(targetPitches, prevPitches) {
         if (!prevPitches || prevPitches.length === 0) return targetPitches;
         return targetPitches.map((pitch, idx) => {
@@ -363,15 +312,15 @@
         }).sort((a, b) => a - b);
     }
 
+    // MELODIC MOVEMENT ENGINE
     function calculateMelodyNote(rootMidi, scale, currentChord) {
         let nextPitch = lastMelodyPitch;
 
-        // Golden Rule of Leaps
         if (lastLeapWasUp) {
-            nextPitch -= (Math.random() < 0.75 ? 2 : 1); // Counterbalance upward leap
+            nextPitch -= (Math.random() < 0.7 ? 2 : 1);
             lastLeapWasUp = false;
         } else {
-            if (Math.random() < (chaosRho / 100)) { // Chaos parameter influences leap probability
+            if (Math.random() < (chaosRho / 100)) {
                 nextPitch += (Math.random() < 0.5 ? 5 : 7);
                 lastLeapWasUp = true;
             } else {
@@ -379,8 +328,8 @@
             }
         }
 
-        // Chord-Tone Attraction
-        if (Math.random() < chordTonePull) {
+        // Chord-tone attraction on strong beats
+        if (gridStep % 8 === 0) {
             const upperChord = currentChord.map(p => p + 12);
             nextPitch = upperChord.reduce((prev, curr) => 
                 Math.abs(curr - nextPitch) < Math.abs(prev - nextPitch) ? curr : prev
@@ -391,17 +340,17 @@
         return nextPitch;
     }
 
-    // --- MAIN GENERATIVE ENGINE STEP ---
+    // TICK TICK STEP ENGINE
     function tick() {
-        const rootMidi = parseInt(document.getElementById('rootSelect').value) + 48; // C3
+        const rootMidi = parseInt(document.getElementById('rootSelect').value) + 55; // G3
         const scaleType = document.getElementById('scaleSelect').value;
-        const scale = SCALES[scaleType] || SCALES.major;
+        const scale = SCALES[scaleType] || SCALES.minor;
 
         const stepInBar = gridStep % 16;
-        const barIdx = Math.floor(gridStep / 16) % currentProgression.length;
-        const degree = currentProgression[barIdx];
+        const barIdx = Math.floor(gridStep / 16) % PROGRESSION_DEGREES.length;
+        const degree = PROGRESSION_DEGREES[barIdx];
 
-        // 1. Calculate Voiced Chord
+        // Chord Calculation
         const numScale = scale.length;
         const rawChord = [
             rootMidi + scale[degree % numScale],
@@ -411,46 +360,23 @@
         const voicedChord = applyVoiceLeading(rawChord, previousChordVoicing);
         previousChordVoicing = voicedChord;
 
-        // UI Updates
-        const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-        const rootName = noteNames[(rootMidi + scale[degree % numScale]) % 12];
-        document.getElementById('currentChordDisp').innerText = `${rootName} Chord`;
-
-        // 2. Play Chords
-        const style = document.getElementById('styleSelect').value;
-        if (chordsEnabled) {
-            if (style === 'pad' && stepInBar === 0) {
-                voicedChord.forEach(p => playTone(mtof(p), 'triangle', 2.0, 0.10));
-            } else if ((style === 'groove' || style === 'stride') && (stepInBar === 0 || stepInBar === 6 || stepInBar === 10)) {
-                voicedChord.forEach((p, i) => {
-                    setTimeout(() => playTone(mtof(p), 'triangle', 0.35, 0.12), i * 15);
-                });
-            } else if (style === 'arpeggiated' && stepInBar % 2 === 0) {
-                const note = voicedChord[(stepInBar / 2) % voicedChord.length];
-                playTone(mtof(note), 'sine', 0.25, 0.14);
-            }
+        // 1. Play Chords
+        if (chordsEnabled && (stepInBar === 0 || stepInBar === 6)) {
+            voicedChord.forEach((p, i) => {
+                setTimeout(() => playTone(mtof(p), 'triangle', 0.6, 0.12), i * 15);
+            });
         }
 
-        // 3. Play Bass
+        // 2. Play Bass
         if (bassEnabled && (stepInBar % 4 === 0)) {
-            playTone(mtof(voicedChord[0] - 12), 'sawtooth', 0.3, 0.22);
+            playTone(mtof(voicedChord[0] - 12), 'sawtooth', 0.4, 0.22);
         }
 
-        // 4. Play Lead Melody
-        if (stepInBar % 2 === 0) {
-            if (Math.random() * 100 < rhythmSpread) {
-                const wave = document.getElementById('leadWaveSelect').value;
-                const melPitch = calculateMelodyNote(rootMidi + 12, scale, voicedChord);
-                
-                // Grace note embellishment
-                if (Math.random() * 100 < graceNoteChance) {
-                    playTone(mtof(melPitch - 1), wave, 0.08, 0.08, true);
-                }
-
-                playTone(mtof(melPitch), wave, 0.28, 0.18, true);
-                totalNotes++;
-                document.getElementById('noteCount').innerText = totalNotes;
-            }
+        // 3. Play Lead Line
+        if (leadEnabled && (stepInBar % 2 === 0)) {
+            const wave = document.getElementById('leadWaveSelect').value;
+            const melPitch = calculateMelodyNote(rootMidi + 12, scale, voicedChord);
+            playTone(mtof(melPitch), wave, 0.3, 0.16, true);
         }
 
         gridStep = (gridStep + 1) % 64;
@@ -460,7 +386,6 @@
         initAudio();
         isPlaying = true;
         document.getElementById('btnRun').innerText = '■ STOP ENGINE';
-        document.getElementById('btnRun').classList.add('active');
 
         const stepInterval = (60 / tempo) * 1000 / 4;
         playTimer = setInterval(tick, stepInterval);
@@ -470,37 +395,36 @@
         isPlaying = false;
         if (playTimer) { clearInterval(playTimer); playTimer = null; }
         document.getElementById('btnRun').innerText = '► RUN ENGINE';
-        document.getElementById('btnRun').classList.remove('active');
     }
 
-    // --- GENRE PRESETS CONFIGURATOR ---
-    const GENRE_CONFIGS = {
-        JAZZ: { tempo: 120, scale: 'dorian', wave: 'triangle', cutoff: 2400, attack: 0.04, release: 0.5, spread: 75, pull: 0.6 },
-        LOFI: { tempo: 82, scale: 'minor', wave: 'sine', cutoff: 1800, attack: 0.08, release: 0.6, spread: 50, pull: 0.8 },
-        SYNTHWAVE: { tempo: 112, scale: 'minor', wave: 'sawtooth', cutoff: 3800, attack: 0.01, release: 0.35, spread: 80, pull: 0.7 },
-        CLASSICAL: { tempo: 96, scale: 'major', wave: 'triangle', cutoff: 3200, attack: 0.05, release: 0.7, spread: 65, pull: 0.85 },
-        AMBIENT: { tempo: 70, scale: 'pentatonic', wave: 'sine', cutoff: 1400, attack: 0.25, release: 1.5, spread: 40, pull: 0.9 },
-        FUNK: { tempo: 116, scale: 'mixolydian', wave: 'square', cutoff: 4500, attack: 0.01, release: 0.2, spread: 90, pull: 0.5 },
-        ROCK: { tempo: 130, scale: 'minor', wave: 'sawtooth', cutoff: 5000, attack: 0.01, release: 0.3, spread: 85, pull: 0.6 },
-        BLUES: { tempo: 88, scale: 'mixolydian', wave: 'triangle', cutoff: 2800, attack: 0.03, release: 0.45, spread: 70, pull: 0.65 },
-        POP: { tempo: 124, scale: 'major', wave: 'sawtooth', cutoff: 4200, attack: 0.015, release: 0.35, spread: 85, pull: 0.75 },
-        EDM: { tempo: 128, scale: 'minor', wave: 'sawtooth', cutoff: 6500, attack: 0.005, release: 0.25, spread: 95, pull: 0.5 }
+    // GENRE PRESET PRESETS
+    const GENRES = {
+        JAZZ: { tempo: 118, scale: 'dorian', wave: 'triangle', cutoff: 2800, attack: 0.05, release: 1.2, rho: 30.0 },
+        LOFI: { tempo: 80, scale: 'minor', wave: 'sine', cutoff: 1800, attack: 0.1, release: 1.8, rho: 20.0 },
+        SYNTHWAVE: { tempo: 124, scale: 'minor', wave: 'sine', cutoff: 4479, attack: 0.08, release: 1.5, rho: 45.4 },
+        CLASSICAL: { tempo: 92, scale: 'major', wave: 'triangle', cutoff: 3500, attack: 0.06, release: 2.0, rho: 25.0 },
+        AMBIENT: { tempo: 68, scale: 'pentatonic', wave: 'sine', cutoff: 1200, attack: 0.3, release: 2.8, rho: 15.0 },
+        FUNK: { tempo: 115, scale: 'mixolydian', wave: 'sawtooth', cutoff: 5200, attack: 0.01, release: 0.6, rho: 40.0 },
+        ROCK: { tempo: 132, scale: 'minor', wave: 'sawtooth', cutoff: 6000, attack: 0.01, release: 0.8, rho: 35.0 },
+        BLUES: { tempo: 90, scale: 'mixolydian', wave: 'triangle', cutoff: 3000, attack: 0.04, release: 1.0, rho: 28.0 },
+        POP: { tempo: 120, scale: 'major', wave: 'square', cutoff: 4800, attack: 0.02, release: 1.1, rho: 32.0 },
+        EDM: { tempo: 128, scale: 'minor', wave: 'sawtooth', cutoff: 7000, attack: 0.005, release: 0.5, rho: 48.0 }
     };
 
-    function applyGenre(genreKey) {
-        const cfg = GENRE_CONFIGS[genreKey];
+    function applyGenre(key) {
+        const cfg = GENRES[key];
         if (!cfg) return;
 
         tempo = cfg.tempo;
         document.getElementById('tempoSlider').value = tempo;
-        document.getElementById('tempoVal').innerText = `${tempo} bpm`;
+        document.getElementById('tempoVal').innerText = `${tempo}bpm`;
 
         document.getElementById('scaleSelect').value = cfg.scale;
         document.getElementById('leadWaveSelect').value = cfg.wave;
 
         filterCutoff = cfg.cutoff;
         document.getElementById('cutoffSlider').value = filterCutoff;
-        document.getElementById('cutoffVal').innerText = `${filterCutoff} Hz`;
+        document.getElementById('cutoffVal').innerText = `${filterCutoff}Hz`;
         if (mainFilter && audioCtx) mainFilter.frequency.setValueAtTime(filterCutoff, audioCtx.currentTime);
 
         attackTime = cfg.attack;
@@ -511,25 +435,30 @@
         document.getElementById('releaseSlider').value = releaseTime;
         document.getElementById('releaseVal').innerText = `${releaseTime}s`;
 
-        rhythmSpread = cfg.spread;
-        document.getElementById('spreadSlider').value = rhythmSpread;
-        document.getElementById('spreadVal').innerText = `${rhythmSpread}%`;
+        chaosRho = cfg.rho;
+        document.getElementById('rhoSlider').value = chaosRho;
+        document.getElementById('rhoVal').innerText = chaosRho.toFixed(1);
 
-        chordTonePull = cfg.pull;
-        document.getElementById('pullSlider').value = chordTonePull;
-        document.getElementById('pullVal').innerText = chordTonePull.toFixed(2);
-
-        document.getElementById('genreDisplay').innerText = genreKey;
+        document.getElementById('genreDisplay').innerText = key;
 
         if (isPlaying) { stopEngine(); startEngine(); }
     }
 
-    // --- EVENT LISTENERS ---
+    // --- DOM EVENT LISTENERS ---
     document.getElementById('btnRun').addEventListener('click', () => {
         if (isPlaying) stopEngine(); else startEngine();
     });
 
-    document.getElementById('genreButtons').addEventListener('click', (e) => {
+    document.getElementById('btnSave').addEventListener('click', () => {
+        stopEngine();
+        document.getElementById('modalOverlay').style.display = 'flex';
+    });
+
+    document.getElementById('modalClose').addEventListener('click', () => {
+        document.getElementById('modalOverlay').style.display = 'none';
+    });
+
+    document.getElementById('genreGrid').addEventListener('click', (e) => {
         const chip = e.target.closest('.genre-chip');
         if (!chip) return;
         document.querySelectorAll('.genre-chip').forEach(c => c.classList.remove('active'));
@@ -537,17 +466,9 @@
         applyGenre(chip.dataset.genre);
     });
 
-    document.getElementById('emotionButtons').addEventListener('click', (e) => {
-        const chip = e.target.closest('.emotion-chip');
-        if (!chip) return;
-        document.querySelectorAll('.emotion-chip').forEach(c => c.classList.remove('active'));
-        chip.classList.add('active');
-        document.getElementById('feelingDisp').innerText = chip.dataset.feel;
-    });
-
     document.getElementById('cutoffSlider').addEventListener('input', (e) => {
         filterCutoff = parseFloat(e.target.value);
-        document.getElementById('cutoffVal').innerText = `${filterCutoff} Hz`;
+        document.getElementById('cutoffVal').innerText = `${filterCutoff}Hz`;
         if (mainFilter && audioCtx) mainFilter.frequency.setValueAtTime(filterCutoff, audioCtx.currentTime);
     });
 
@@ -563,13 +484,8 @@
 
     document.getElementById('tempoSlider').addEventListener('input', (e) => {
         tempo = parseInt(e.target.value);
-        document.getElementById('tempoVal').innerText = `${tempo} bpm`;
+        document.getElementById('tempoVal').innerText = `${tempo}bpm`;
         if (isPlaying) { stopEngine(); startEngine(); }
-    });
-
-    document.getElementById('pullSlider').addEventListener('input', (e) => {
-        chordTonePull = parseFloat(e.target.value);
-        document.getElementById('pullVal').innerText = chordTonePull.toFixed(2);
     });
 
     document.getElementById('rhoSlider').addEventListener('input', (e) => {
@@ -577,14 +493,9 @@
         document.getElementById('rhoVal').innerText = chaosRho.toFixed(1);
     });
 
-    document.getElementById('spreadSlider').addEventListener('input', (e) => {
-        rhythmSpread = parseInt(e.target.value);
-        document.getElementById('spreadVal').innerText = `${rhythmSpread}%`;
-    });
-
-    document.getElementById('graceSlider').addEventListener('input', (e) => {
-        graceNoteChance = parseInt(e.target.value);
-        document.getElementById('graceVal').innerText = `${graceNoteChance}%`;
+    document.getElementById('toggleLead').addEventListener('click', function() {
+        leadEnabled = !leadEnabled;
+        this.classList.toggle('active', leadEnabled);
     });
 
     document.getElementById('toggleChords').addEventListener('click', function() {

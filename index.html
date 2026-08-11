@@ -262,6 +262,7 @@
 
     // FX buses
     let reverbConvolver = null, reverbSend = null, reverbWet = null;
+    let recordTapGain = null;
     let delayNode = null, delaySend = null, delayFeedback = null, delayWet = null;
 
     // Movement LFOs (persistent, connected additively to AudioParams)
@@ -450,6 +451,17 @@
 
             masterCompressor.connect(audioCtx.destination);
 
+            // Permanent recording tap: masterCompressor's connection to this node
+            // is never touched again. All start/stop of the WAV recorder happens
+            // downstream of *this* node instead of on masterCompressor directly —
+            // on some browsers (Safari in particular) AudioNode.disconnect(node)
+            // isn't reliably selective and can silently drop *all* outputs of the
+            // node it's called on, which would kill main audio output too if we
+            // ever called disconnect() directly on masterCompressor.
+            recordTapGain = audioCtx.createGain();
+            recordTapGain.gain.setValueAtTime(1.0, audioCtx.currentTime);
+            masterCompressor.connect(recordTapGain);
+
             // --- Movement LFOs (Production-Based Movement) ---
             // Vibrato: subtle pitch LFO, connected per-voice to osc.detune
             vibratoOsc = audioCtx.createOscillator();
@@ -635,10 +647,13 @@
         ROCK: {
             // Driving eighth-note power-chord chugging (chordStyle 'stab' with a
             // dense compPattern) instead of one sustained pad per bar, and a much
-            // shorter release for a tight, punchy rhythm-guitar character.
+            // shorter release for a tight, punchy rhythm-guitar character. Bass
+            // now locks to the same eighth-note pattern as the chord stabs —
+            // previously it only hit twice a bar and read as thin/underpowered
+            // next to the busier guitar part.
             tempo: 132, scale: 'minor', wave: 'sawtooth', cutoff: 6000, attack: 0.006, release: 0.28, rho: 35.0,
             markov: 'functional', selfLoopBias: 0.12, harmonicRhythm: 16, startDegree: 0,
-            chordStyle: 'stab', compPattern: [0, 2, 4, 6, 8, 10, 12, 14], bassStyle: 'rootFifth', colorTones: 0,
+            chordStyle: 'stab', compPattern: [0, 2, 4, 6, 8, 10, 12, 14], bassStyle: 'syncopated', colorTones: 0,
             melody: { density: 2, leapWeight: 0.32, restProb: 0.20 },
             swing: 50, humanize: 18, reverbMix: 14, delayMix: 4,
             vibratoDepth: 0, vibratoRate: 5.0, tremoloDepth: 0.0, tremoloRate: 3.0, panDepth: 0.05, filterSweepDepth: 150
@@ -1064,7 +1079,7 @@
             };
             silentSink = audioCtx.createGain();
             silentSink.gain.setValueAtTime(0, audioCtx.currentTime); // must reach destination to keep processing alive, but silently
-            masterCompressor.connect(scriptNode);
+            recordTapGain.connect(scriptNode);
             scriptNode.connect(silentSink);
             silentSink.connect(audioCtx.destination);
 
@@ -1084,7 +1099,7 @@
 
         if (scriptNode) {
             scriptNode.onaudioprocess = null;
-            try { masterCompressor.disconnect(scriptNode); } catch (err) {}
+            try { recordTapGain.disconnect(scriptNode); } catch (err) {}
             try { scriptNode.disconnect(); } catch (err) {}
             try { silentSink.disconnect(); } catch (err) {}
             scriptNode = null;

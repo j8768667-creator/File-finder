@@ -266,6 +266,7 @@
     let reverbConvolver = null, reverbSend = null, reverbWet = null;
     let recordTapGain = null;
     let noiseBuffer = null;
+    let drumBus = null, drumReverbSend = null;
     let delayNode = null, delaySend = null, delayFeedback = null, delayWet = null;
 
     // Movement LFOs (persistent, connected additively to AudioParams)
@@ -455,6 +456,23 @@
 
             masterCompressor.connect(audioCtx.destination);
 
+            // Dedicated drum bus — deliberately bypasses masterFilter (the
+            // melodic lowpass, as low as 1200Hz on Ambient) and the shared
+            // reverb/delay sends (as high as 62% wet on Ambient). Percussive
+            // transients routed through the same filter+heavy-reverb chain as
+            // the pads lose their high-frequency snap (hihat especially) and
+            // get smeared together in the wash — which reads as "too much
+            // reverb" and "drums all sound similar." Drums get their own small,
+            // fixed reverb send instead, independent of the genre's wet level.
+            drumBus = audioCtx.createGain();
+            drumBus.gain.setValueAtTime(1.0, audioCtx.currentTime);
+            drumBus.connect(masterCompressor);
+
+            drumReverbSend = audioCtx.createGain();
+            drumReverbSend.gain.setValueAtTime(0.09, audioCtx.currentTime);
+            drumBus.connect(drumReverbSend);
+            drumReverbSend.connect(reverbConvolver);
+
             // Permanent recording tap: masterCompressor's connection to this node
             // is never touched again. All start/stop of the WAV recorder happens
             // downstream of *this* node instead of on masterCompressor directly —
@@ -544,7 +562,7 @@
             g.gain.setValueAtTime(0.0001, startAt);
             g.gain.linearRampToValueAtTime(drumVol, startAt + 0.004);
             g.gain.exponentialRampToValueAtTime(0.001, startAt + 0.32);
-            osc.connect(g); g.connect(masterGain);
+            osc.connect(g); g.connect(drumBus);
             osc.start(startAt); osc.stop(startAt + 0.34);
             logDrumEvent(36);
         } else if (type === 'snare') {
@@ -558,7 +576,7 @@
             ng.gain.setValueAtTime(0.0001, startAt);
             ng.gain.linearRampToValueAtTime(drumVol * 0.6, startAt + 0.003);
             ng.gain.exponentialRampToValueAtTime(0.001, startAt + 0.16);
-            noise.connect(bp); bp.connect(ng); ng.connect(masterGain);
+            noise.connect(bp); bp.connect(ng); ng.connect(drumBus);
             noise.start(startAt); noise.stop(startAt + 0.18);
 
             const osc = audioCtx.createOscillator();
@@ -568,7 +586,7 @@
             og.gain.setValueAtTime(0.0001, startAt);
             og.gain.linearRampToValueAtTime(drumVol * 0.25, startAt + 0.003);
             og.gain.exponentialRampToValueAtTime(0.001, startAt + 0.09);
-            osc.connect(og); og.connect(masterGain);
+            osc.connect(og); og.connect(drumBus);
             osc.start(startAt); osc.stop(startAt + 0.1);
             logDrumEvent(38);
         } else if (type === 'hatClosed' || type === 'hatOpen') {
@@ -583,7 +601,7 @@
             g.gain.setValueAtTime(0.0001, startAt);
             g.gain.linearRampToValueAtTime(drumVol * (open ? 0.2 : 0.26), startAt + 0.002);
             g.gain.exponentialRampToValueAtTime(0.001, startAt + dur);
-            noise.connect(hp); hp.connect(g); g.connect(masterGain);
+            noise.connect(hp); hp.connect(g); g.connect(drumBus);
             noise.start(startAt); noise.stop(startAt + dur + 0.02);
             logDrumEvent(open ? 46 : 42);
         }

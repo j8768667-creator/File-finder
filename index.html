@@ -55,7 +55,7 @@
 
         .val-disp { color: var(--accent-orange); font-weight: bold; font-size: 11px; }
 
-        .toggle-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 10px; }
+        .toggle-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(75px, 1fr)); gap: 8px; margin-top: 10px; }
         .toggle-btn { background-color: var(--input-bg); border: 1px solid var(--panel-border); color: var(--text-dim); padding: 10px; font-size: 10px; border-radius: 4px; text-align: center; cursor: pointer; font-weight: bold; display: flex; align-items: center; justify-content: center; gap: 6px; }
         .toggle-btn.active { background-color: #cce3de; border-color: var(--accent-green); color: var(--accent-green); }
         .indicator { width: 6px; height: 6px; border-radius: 50%; background-color: var(--accent-green); }
@@ -211,6 +211,7 @@
                     <div class="toggle-btn active" id="toggleLead"><div class="indicator"></div> Lead Track</div>
                     <div class="toggle-btn active" id="toggleChords"><div class="indicator"></div> Chords Track</div>
                     <div class="toggle-btn active" id="toggleBass"><div class="indicator"></div> Bass Track</div>
+                    <div class="toggle-btn active" id="toggleDrums"><div class="indicator"></div> Drums</div>
                 </div>
             </div>
 
@@ -234,8 +235,9 @@
             <div class="panel">
                 <div class="panel-header">EXPORT</div>
                 <div class="info-card">
-                    Exports a <b>Multitrack Standard MIDI File (Type 1)</b> with separate tracks for Lead, Chords, and
-                    Bass, including humanized velocity. WAV recording captures the full wet mix (reverb + delay).
+                    Exports a <b>Multitrack Standard MIDI File (Type 1)</b> with separate tracks for Lead, Chords,
+                    Bass, and Drums (GM channel 10), including humanized velocity. WAV recording captures the full
+                    wet mix (reverb + delay).
                 </div>
             </div>
         </div>
@@ -263,6 +265,7 @@
     // FX buses
     let reverbConvolver = null, reverbSend = null, reverbWet = null;
     let recordTapGain = null;
+    let noiseBuffer = null;
     let delayNode = null, delaySend = null, delayFeedback = null, delayWet = null;
 
     // Movement LFOs (persistent, connected additively to AudioParams)
@@ -290,6 +293,7 @@
     let leadEnabled = true;
     let chordsEnabled = true;
     let bassEnabled = true;
+    let drumsEnabled = true;
     let extensionsEnabled = true;
     let styleFxEnabled = true;
     let walkBassEnabled = true;
@@ -500,10 +504,88 @@
             filterSweepOsc.connect(filterSweepGain);
             filterSweepGain.connect(masterFilter.frequency);
             filterSweepOsc.start();
+
+            // Shared 2-second white-noise buffer, reused (via fresh BufferSource
+            // nodes) for every snare/hihat hit — synthesized drums, no samples,
+            // so the app stays a single portable file.
+            noiseBuffer = audioCtx.createBuffer(1, audioCtx.sampleRate * 2, audioCtx.sampleRate);
+            const noiseData = noiseBuffer.getChannelData(0);
+            for (let i = 0; i < noiseData.length; i++) noiseData[i] = Math.random() * 2 - 1;
         }
 
         if (audioCtx.state === 'suspended') {
             audioCtx.resume();
+        }
+    }
+
+    // =========================================================================
+    // DRUM SYNTHESIS — kick / snare / closed & open hihat, all synthesized
+    // (sine sweep, filtered noise) so no external sample files are needed.
+    // =========================================================================
+    function logDrumEvent(gmNote) {
+        if (isPlaying) {
+            recordedEvents.push({ step: totalStepsPlayed, pitch: gmNote, durationSteps: 1, track: 'drums', velocity: 105 });
+        }
+    }
+
+    function playDrumHit(type) {
+        if (!audioCtx) return;
+        const now = audioCtx.currentTime;
+        const humanizeAmt = humanizePercent / 100;
+        const startAt = now + Math.random() * 0.012 * humanizeAmt;
+        const drumVol = 0.9;
+
+        if (type === 'kick') {
+            const osc = audioCtx.createOscillator();
+            const g = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(150, startAt);
+            osc.frequency.exponentialRampToValueAtTime(42, startAt + 0.11);
+            g.gain.setValueAtTime(0.0001, startAt);
+            g.gain.linearRampToValueAtTime(drumVol, startAt + 0.004);
+            g.gain.exponentialRampToValueAtTime(0.001, startAt + 0.32);
+            osc.connect(g); g.connect(masterGain);
+            osc.start(startAt); osc.stop(startAt + 0.34);
+            logDrumEvent(36);
+        } else if (type === 'snare') {
+            const noise = audioCtx.createBufferSource();
+            noise.buffer = noiseBuffer;
+            const bp = audioCtx.createBiquadFilter();
+            bp.type = 'bandpass';
+            bp.frequency.setValueAtTime(1900, startAt);
+            bp.Q.setValueAtTime(0.9, startAt);
+            const ng = audioCtx.createGain();
+            ng.gain.setValueAtTime(0.0001, startAt);
+            ng.gain.linearRampToValueAtTime(drumVol * 0.6, startAt + 0.003);
+            ng.gain.exponentialRampToValueAtTime(0.001, startAt + 0.16);
+            noise.connect(bp); bp.connect(ng); ng.connect(masterGain);
+            noise.start(startAt); noise.stop(startAt + 0.18);
+
+            const osc = audioCtx.createOscillator();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(190, startAt);
+            const og = audioCtx.createGain();
+            og.gain.setValueAtTime(0.0001, startAt);
+            og.gain.linearRampToValueAtTime(drumVol * 0.25, startAt + 0.003);
+            og.gain.exponentialRampToValueAtTime(0.001, startAt + 0.09);
+            osc.connect(og); og.connect(masterGain);
+            osc.start(startAt); osc.stop(startAt + 0.1);
+            logDrumEvent(38);
+        } else if (type === 'hatClosed' || type === 'hatOpen') {
+            const open = type === 'hatOpen';
+            const noise = audioCtx.createBufferSource();
+            noise.buffer = noiseBuffer;
+            const hp = audioCtx.createBiquadFilter();
+            hp.type = 'highpass';
+            hp.frequency.setValueAtTime(7500, startAt);
+            const g = audioCtx.createGain();
+            const dur = open ? 0.22 : 0.045;
+            g.gain.setValueAtTime(0.0001, startAt);
+            g.gain.linearRampToValueAtTime(drumVol * (open ? 0.2 : 0.26), startAt + 0.002);
+            g.gain.exponentialRampToValueAtTime(0.001, startAt + dur);
+            noise.connect(hp); hp.connect(g); g.connect(masterGain);
+            noise.start(startAt); noise.stop(startAt + dur + 0.02);
+            logDrumEvent(open ? 46 : 42);
         }
     }
 
@@ -548,7 +630,23 @@
 
         // Movement LFOs connect additively into this voice
         if (trackName === 'lead' && vibratoGain) vibratoGain.connect(osc.detune);
-        if ((trackName === 'chords' || trackName === 'lead') && tremoloGain) tremoloGain.connect(voiceGain.gain);
+        if ((trackName === 'chords' || trackName === 'lead') && tremoloGain) {
+            // Scale the shared tremolo LFO to a *fraction* of this note's own
+            // volume rather than patching the raw LFO straight into gain. The
+            // old version added the genre's tremoloDepth (e.g. EDM's 0.09)
+            // directly onto voiceGain.gain, which typically peaks around
+            // 0.08-0.14 — so the modulation swing was comparable to or larger
+            // than the note itself, collapsing gain to near-zero and back every
+            // cycle. That's what produced the harsh, incoherent "flutter."
+            const tremDepthFraction = (GENRES[currentGenreKey] && GENRES[currentGenreKey].tremoloDepth) || 0;
+            if (tremDepthFraction > 0) {
+                const noteTremScale = audioCtx.createGain();
+                noteTremScale.gain.setValueAtTime(finalVolume * tremDepthFraction, startAt);
+                tremoloGain.connect(noteTremScale);
+                noteTremScale.connect(voiceGain.gain);
+                osc.addEventListener('ended', () => { try { noteTremScale.disconnect(); } catch (e) {} });
+            }
+        }
 
         voiceFilter.type = 'lowpass';
         let targetCutoff = filterCutoff;
@@ -602,7 +700,8 @@
             chordStyle: 'comp', compPattern: [0, 6], bassStyle: 'walking', colorTones: 2,
             melody: { density: 2, leapWeight: 0.35, restProb: 0.30 },
             swing: 62, humanize: 35, reverbMix: 22, delayMix: 6,
-            vibratoDepth: 7, vibratoRate: 5.4, tremoloDepth: 0.015, tremoloRate: 3.0, panDepth: 0.12, filterSweepDepth: 350
+            vibratoDepth: 7, vibratoRate: 5.4, tremoloDepth: 0.015, tremoloRate: 3.0, panDepth: 0.12, filterSweepDepth: 350,
+            drums: { kick: [0, 10], snare: [10], hatClosed: [0, 2, 4, 6, 8, 10, 12, 14], hatOpen: [] }
         },
         LOFI: {
             tempo: 80, scale: 'minor', wave: 'sine', cutoff: 1800, attack: 0.1, release: 1.8, rho: 20.0,
@@ -610,7 +709,8 @@
             chordStyle: 'block', bassStyle: 'walking', colorTones: 1,
             melody: { density: 4, leapWeight: 0.15, restProb: 0.45 },
             swing: 58, humanize: 48, reverbMix: 36, delayMix: 10, flutter: true,
-            vibratoDepth: 4, vibratoRate: 4.2, tremoloDepth: 0.02, tremoloRate: 2.2, panDepth: 0.1, filterSweepDepth: 300
+            vibratoDepth: 4, vibratoRate: 4.2, tremoloDepth: 0.02, tremoloRate: 2.2, panDepth: 0.1, filterSweepDepth: 300,
+            drums: { kick: [0, 10], snare: [4, 12], hatClosed: [0, 4, 8, 12], hatOpen: [] }
         },
         SYNTHWAVE: {
             tempo: 124, scale: 'minor', wave: 'triangle', cutoff: 4479, attack: 0.08, release: 1.5, rho: 45.4,
@@ -618,7 +718,8 @@
             chordStyle: 'arp', bassStyle: 'pulsing', colorTones: 1,
             melody: { density: 2, leapWeight: 0.28, restProb: 0.20 },
             swing: 50, humanize: 12, reverbMix: 30, delayMix: 26,
-            vibratoDepth: 5, vibratoRate: 5.8, tremoloDepth: 0.02, tremoloRate: 4.0, panDepth: 0.22, filterSweepDepth: 600
+            vibratoDepth: 5, vibratoRate: 5.8, tremoloDepth: 0.02, tremoloRate: 4.0, panDepth: 0.22, filterSweepDepth: 600,
+            drums: { kick: [0, 8], snare: [4, 12], hatClosed: [2, 6, 10, 14], hatOpen: [] }
         },
         CLASSICAL: {
             tempo: 92, scale: 'major', wave: 'triangle', cutoff: 3500, attack: 0.06, release: 2.0, rho: 25.0,
@@ -626,7 +727,8 @@
             chordStyle: 'sustain', bassStyle: 'rootFifth', colorTones: 0,
             melody: { density: 1, leapWeight: 0.30, restProb: 0.15 },
             swing: 50, humanize: 22, reverbMix: 42, delayMix: 0,
-            vibratoDepth: 6, vibratoRate: 4.8, tremoloDepth: 0.0, tremoloRate: 3.0, panDepth: 0.08, filterSweepDepth: 250
+            vibratoDepth: 6, vibratoRate: 4.8, tremoloDepth: 0.0, tremoloRate: 3.0, panDepth: 0.08, filterSweepDepth: 250,
+            drums: { kick: [], snare: [], hatClosed: [], hatOpen: [] } // no kit — orchestral texture
         },
         AMBIENT: {
             tempo: 68, scale: 'pentatonic', wave: 'sine', cutoff: 1200, attack: 0.3, release: 2.8, rho: 15.0,
@@ -634,7 +736,8 @@
             chordStyle: 'sustain', bassStyle: 'sustained', colorTones: 2,
             melody: { density: 4, leapWeight: 0.10, restProb: 0.55 },
             swing: 50, humanize: 20, reverbMix: 62, delayMix: 30,
-            vibratoDepth: 3, vibratoRate: 3.6, tremoloDepth: 0.03, tremoloRate: 0.8, panDepth: 0.42, filterSweepDepth: 900, filterSweepRate: 0.025
+            vibratoDepth: 3, vibratoRate: 3.6, tremoloDepth: 0.03, tremoloRate: 0.8, panDepth: 0.42, filterSweepDepth: 900, filterSweepRate: 0.025,
+            drums: { kick: [0], snare: [], hatClosed: [], hatOpen: [] } // just a soft downbeat pulse
         },
         FUNK: {
             tempo: 115, scale: 'mixolydian', wave: 'square', cutoff: 5200, attack: 0.01, release: 0.6, rho: 40.0,
@@ -642,7 +745,8 @@
             chordStyle: 'stab', compPattern: [2, 7, 10, 14], bassStyle: 'syncopated', colorTones: 1,
             melody: { density: 1, leapWeight: 0.22, restProb: 0.35 },
             swing: 52, humanize: 26, reverbMix: 10, delayMix: 5,
-            vibratoDepth: 0, vibratoRate: 5.0, tremoloDepth: 0.06, tremoloRate: 5.5, panDepth: 0.06, filterSweepDepth: 200
+            vibratoDepth: 0, vibratoRate: 5.0, tremoloDepth: 0.06, tremoloRate: 5.5, panDepth: 0.06, filterSweepDepth: 200,
+            drums: { kick: [0, 3, 10], snare: [4, 12], hatClosed: [0, 1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12, 13, 15], hatOpen: [6, 14] }
         },
         ROCK: {
             // Driving eighth-note power-chord chugging (chordStyle 'stab' with a
@@ -650,13 +754,15 @@
             // shorter release for a tight, punchy rhythm-guitar character. Bass
             // now locks to the same eighth-note pattern as the chord stabs —
             // previously it only hit twice a bar and read as thin/underpowered
-            // next to the busier guitar part.
+            // next to the busier guitar part. A driving kick/snare/hihat pattern
+            // (see drums.* below) is what actually delivers most of the "punch."
             tempo: 132, scale: 'minor', wave: 'sawtooth', cutoff: 6000, attack: 0.006, release: 0.28, rho: 35.0,
             markov: 'functional', selfLoopBias: 0.12, harmonicRhythm: 16, startDegree: 0,
             chordStyle: 'stab', compPattern: [0, 2, 4, 6, 8, 10, 12, 14], bassStyle: 'syncopated', colorTones: 0,
             melody: { density: 2, leapWeight: 0.32, restProb: 0.20 },
             swing: 50, humanize: 18, reverbMix: 14, delayMix: 4,
-            vibratoDepth: 0, vibratoRate: 5.0, tremoloDepth: 0.0, tremoloRate: 3.0, panDepth: 0.05, filterSweepDepth: 150
+            vibratoDepth: 0, vibratoRate: 5.0, tremoloDepth: 0.0, tremoloRate: 3.0, panDepth: 0.05, filterSweepDepth: 150,
+            drums: { kick: [0, 6, 8, 11], snare: [4, 12], hatClosed: [0, 2, 4, 6, 8, 10, 12, 14], hatOpen: [] }
         },
         BLUES: {
             tempo: 90, scale: 'mixolydian', wave: 'triangle', cutoff: 3000, attack: 0.04, release: 1.0, rho: 28.0,
@@ -664,7 +770,8 @@
             chordStyle: 'comp', compPattern: [0, 4, 8, 12], bassStyle: 'walking', colorTones: 1,
             melody: { density: 2, leapWeight: 0.26, restProb: 0.28 },
             swing: 66, humanize: 32, reverbMix: 20, delayMix: 5,
-            vibratoDepth: 8, vibratoRate: 5.6, tremoloDepth: 0.02, tremoloRate: 3.2, panDepth: 0.1, filterSweepDepth: 300
+            vibratoDepth: 8, vibratoRate: 5.6, tremoloDepth: 0.02, tremoloRate: 3.2, panDepth: 0.1, filterSweepDepth: 300,
+            drums: { kick: [0, 8], snare: [4, 12], hatClosed: [0, 2, 4, 6, 8, 10, 12, 14], hatOpen: [] }
         },
         POP: {
             tempo: 120, scale: 'major', wave: 'square', cutoff: 4800, attack: 0.02, release: 1.1, rho: 32.0,
@@ -672,7 +779,8 @@
             chordStyle: 'block', bassStyle: 'rootFifth', colorTones: 0,
             melody: { density: 2, leapWeight: 0.25, restProb: 0.20 },
             swing: 50, humanize: 14, reverbMix: 22, delayMix: 10,
-            vibratoDepth: 4, vibratoRate: 5.2, tremoloDepth: 0.0, tremoloRate: 3.0, panDepth: 0.08, filterSweepDepth: 200
+            vibratoDepth: 4, vibratoRate: 5.2, tremoloDepth: 0.0, tremoloRate: 3.0, panDepth: 0.08, filterSweepDepth: 200,
+            drums: { kick: [0, 8], snare: [4, 12], hatClosed: [0, 2, 4, 6, 8, 10, 12, 14], hatOpen: [14] }
         },
         EDM: {
             tempo: 128, scale: 'minor', wave: 'sawtooth', cutoff: 7000, attack: 0.005, release: 0.5, rho: 48.0,
@@ -680,7 +788,8 @@
             chordStyle: 'stab', compPattern: [0, 6, 8, 14], bassStyle: 'pulsing', colorTones: 0,
             melody: { density: 1, leapWeight: 0.16, restProb: 0.18 },
             swing: 50, humanize: 6, reverbMix: 16, delayMix: 22,
-            vibratoDepth: 0, vibratoRate: 5.0, tremoloDepth: 0.09, tremoloRate: 6.0, panDepth: 0.18, filterSweepDepth: 700
+            vibratoDepth: 0, vibratoRate: 5.0, tremoloDepth: 0.09, tremoloRate: 6.0, panDepth: 0.18, filterSweepDepth: 700,
+            drums: { kick: [0, 4, 8, 12], snare: [4, 12], hatClosed: [], hatOpen: [2, 6, 10, 14] } // classic four-on-the-floor
         }
     };
 
@@ -987,6 +1096,15 @@
             }
         }
 
+        // ---------------- 4. DRUMS TRACK ----------------
+        if (drumsEnabled && genreCfg.drums) {
+            const d = genreCfg.drums;
+            if (d.kick && d.kick.includes(stepInBar)) playDrumHit('kick');
+            if (d.snare && d.snare.includes(stepInBar)) playDrumHit('snare');
+            if (d.hatClosed && d.hatClosed.includes(stepInBar)) playDrumHit('hatClosed');
+            if (d.hatOpen && d.hatOpen.includes(stepInBar)) playDrumHit('hatOpen');
+        }
+
         gridStep = (gridStep + 1) % 64;
         totalStepsPlayed++;
     }
@@ -1244,20 +1362,24 @@
         const leadEvents = recordedEvents.filter(e => e.track === 'lead');
         const chordEvents = recordedEvents.filter(e => e.track === 'chords');
         const bassEvents = recordedEvents.filter(e => e.track === 'bass');
+        const drumEvents = recordedEvents.filter(e => e.track === 'drums');
 
         const track1 = buildMidiTrackChunk('Lead Synth', 0, 80, leadEvents, ticksPerStep, mpqn);
         const track2 = buildMidiTrackChunk('Chords Pad', 1, 89, chordEvents, ticksPerStep, null);
         const track3 = buildMidiTrackChunk('Bass Synth', 2, 38, bassEvents, ticksPerStep, null);
+        // Channel 9 (zero-indexed) = GM channel 10, the standard percussion
+        // channel; program-change is ignored on it by GM-compliant synths.
+        const track4 = buildMidiTrackChunk('Drums', 9, 0, drumEvents, ticksPerStep, null);
 
         const headerChunk = [
             0x4D, 0x54, 0x68, 0x64,
             0x00, 0x00, 0x00, 0x06,
             0x00, 0x01,
-            0x00, 0x03,
+            0x00, 0x04,
             (ticksPerQuarter >> 8) & 0xFF, ticksPerQuarter & 0xFF
         ];
 
-        const fullMidi = new Uint8Array([...headerChunk, ...track1, ...track2, ...track3]);
+        const fullMidi = new Uint8Array([...headerChunk, ...track1, ...track2, ...track3, ...track4]);
         const blob = new Blob([fullMidi], { type: 'audio/midi' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -1407,6 +1529,11 @@
     document.getElementById('toggleBass').addEventListener('click', function() {
         bassEnabled = !bassEnabled;
         this.classList.toggle('active', bassEnabled);
+    });
+
+    document.getElementById('toggleDrums').addEventListener('click', function() {
+        drumsEnabled = !drumsEnabled;
+        this.classList.toggle('active', drumsEnabled);
     });
 
     document.getElementById('toggleExtensions').addEventListener('click', function() {

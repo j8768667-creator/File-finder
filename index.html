@@ -570,12 +570,13 @@
         const now = audioCtx.currentTime;
         const humanizeAmt = humanizePercent / 100;
         const startAt = now + Math.random() * 0.012 * humanizeAmt;
-        // Rebalanced against the melodic voices, which peak around 0.08-0.19
-        // (see playTone). The kick was previously 0.9 — 5-10x louder than
-        // everything else in the mix, including the snare and hihat — which
-        // masked them almost entirely and made the mix read as one loud boomy
-        // kick regardless of genre. 0.4 keeps it punchy without burying the rest.
-        const drumVol = 0.4;
+        // Boosted again — the previous 0.4 was well-balanced against melodic
+        // volumes on paper, but in practice the drums still weren't reading
+        // as present next to the pads/leads. 0.55 pushes them further forward
+        // in the mix; the kick also gets a short high-passed "click" layered
+        // on the attack, which is what actually gives a kick definition and
+        // punch (a pure sine sweep alone reads as a soft thump, not a hit).
+        const drumVol = 0.55;
 
         if (type === 'kick') {
             const osc = audioCtx.createOscillator();
@@ -588,6 +589,22 @@
             g.gain.exponentialRampToValueAtTime(0.001, startAt + 0.32);
             osc.connect(g); g.connect(drumBus);
             osc.start(startAt); osc.stop(startAt + 0.34);
+
+            // Beater click — a very short, high-passed noise burst right on
+            // the attack, giving the kick a percussive "hit" instead of just
+            // a soft low-frequency thump.
+            const click = audioCtx.createBufferSource();
+            click.buffer = noiseBuffer;
+            const clickHp = audioCtx.createBiquadFilter();
+            clickHp.type = 'highpass';
+            clickHp.frequency.setValueAtTime(1200, startAt);
+            const clickGain = audioCtx.createGain();
+            clickGain.gain.setValueAtTime(0.0001, startAt);
+            clickGain.gain.linearRampToValueAtTime(drumVol * 0.45, startAt + 0.001);
+            clickGain.gain.exponentialRampToValueAtTime(0.001, startAt + 0.022);
+            click.connect(clickHp); clickHp.connect(clickGain); clickGain.connect(drumBus);
+            click.start(startAt); click.stop(startAt + 0.03);
+
             logDrumEvent(36);
         } else if (type === 'snare') {
             const noise = audioCtx.createBufferSource();
@@ -670,6 +687,7 @@
         if (!audioCtx) return;
         opts = opts || {};
         const now = audioCtx.currentTime;
+        const genreCfgNow = GENRES[currentGenreKey] || {};
 
         // Humanize: micro-timing offset + velocity randomization
         const humanizeAmt = humanizePercent / 100;
@@ -678,20 +696,53 @@
         const finalVolume = Math.max(0.001, volume * velJitter);
         const startAt = now + timeOffset;
 
-        const osc = audioCtx.createOscillator();
         const voiceFilter = audioCtx.createBiquadFilter();
         const voiceGain = audioCtx.createGain();
 
-        osc.type = waveType;
-        osc.frequency.setValueAtTime(mtof(midiPitch), startAt);
+        // Unison/detune stack — genre-tunable, applied to chords/lead. This is
+        // the single biggest lever for making an instrument sound like a real
+        // "instrument" instead of one thin oscillator: a synthwave/EDM lead
+        // gets a wide supersaw-style stack, orchestral strings get a subtle
+        // ensemble chorus, while genres that want a plain, pure tone (Country's
+        // single acoustic string, Hip-Hop's mono sample-chop) stay at 1 voice.
+        const unisonCount = (trackName === 'chords' || trackName === 'lead')
+            ? Math.max(1, Math.min(4, genreCfgNow.unisonVoices || 1)) : 1;
+        const unisonDetune = genreCfgNow.unisonDetune || 10;
 
-        // Wow/flutter style analog drift for lo-fi character (subtle pitch wander)
-        if (opts.flutter) {
-            osc.detune.setValueAtTime((Math.random() * 2 - 1) * 8, startAt);
+        const oscList = [];
+        for (let v = 0; v < unisonCount; v++) {
+            const osc = audioCtx.createOscillator();
+            osc.type = waveType;
+
+            // 808-style pitch slide for hip-hop/trap-style sub bass — the note
+            // starts a few semitones sharp and glides down into pitch, the
+            // classic "bwoop" that a plain sustained sine can't produce.
+            if (opts.slide808) {
+                osc.frequency.setValueAtTime(mtof(midiPitch + 5), startAt);
+                osc.frequency.exponentialRampToValueAtTime(mtof(midiPitch), startAt + 0.09);
+            } else {
+                osc.frequency.setValueAtTime(mtof(midiPitch), startAt);
+            }
+
+            if (unisonCount > 1) {
+                const spread = (v - (unisonCount - 1) / 2) * unisonDetune;
+                osc.detune.setValueAtTime(spread, startAt);
+            }
+            // Wow/flutter style analog drift for lo-fi character (subtle pitch wander)
+            if (opts.flutter) {
+                osc.detune.setValueAtTime((osc.detune.value || 0) + (Math.random() * 2 - 1) * 8, startAt);
+            }
+            // Movement LFOs connect additively into every voice in the stack
+            if (trackName === 'lead' && vibratoGain) vibratoGain.connect(osc.detune);
+
+            osc.connect(voiceFilter);
+            osc.start(startAt);
+            osc.stop(startAt + duration + releaseTime + 0.05);
+            oscList.push(osc);
         }
+        // Compensate loudness for multiple summed oscillators (perceptual, sqrt law)
+        const unisonGainComp = 1 / Math.sqrt(unisonCount);
 
-        // Movement LFOs connect additively into this voice
-        if (trackName === 'lead' && vibratoGain) vibratoGain.connect(osc.detune);
         if ((trackName === 'chords' || trackName === 'lead') && tremoloGain) {
             // Scale the shared tremolo LFO to a *fraction* of this note's own
             // volume rather than patching the raw LFO straight into gain. The
@@ -700,13 +751,13 @@
             // 0.08-0.14 — so the modulation swing was comparable to or larger
             // than the note itself, collapsing gain to near-zero and back every
             // cycle. That's what produced the harsh, incoherent "flutter."
-            const tremDepthFraction = (GENRES[currentGenreKey] && GENRES[currentGenreKey].tremoloDepth) || 0;
+            const tremDepthFraction = genreCfgNow.tremoloDepth || 0;
             if (tremDepthFraction > 0) {
                 const noteTremScale = audioCtx.createGain();
                 noteTremScale.gain.setValueAtTime(finalVolume * tremDepthFraction, startAt);
                 tremoloGain.connect(noteTremScale);
                 noteTremScale.connect(voiceGain.gain);
-                osc.addEventListener('ended', () => { try { noteTremScale.disconnect(); } catch (e) {} });
+                oscList[0].addEventListener('ended', () => { try { noteTremScale.disconnect(); } catch (e) {} });
             }
         }
 
@@ -719,17 +770,27 @@
         voiceFilter.frequency.exponentialRampToValueAtTime(Math.min(11000, targetCutoff * 1.6), startAt + attackTime);
         voiceFilter.frequency.exponentialRampToValueAtTime(Math.max(180, targetCutoff * 0.3), startAt + duration + releaseTime);
 
-        voiceGain.gain.setValueAtTime(0.0001, startAt);
-        voiceGain.gain.linearRampToValueAtTime(finalVolume, startAt + attackTime);
-        voiceGain.gain.exponentialRampToValueAtTime(Math.max(0.0001, finalVolume * 0.35), startAt + attackTime + 0.1);
-        voiceGain.gain.exponentialRampToValueAtTime(0.0001, startAt + duration + releaseTime);
-
-        osc.connect(voiceFilter);
+        const targetVol = finalVolume * unisonGainComp;
+        if (opts.pluck) {
+            // Plucked/strummed envelope — fast attack, fast decay to near-
+            // silence well before "duration" ends, instead of sustaining like
+            // a pad. This is what makes Country's chords read as a strummed
+            // acoustic guitar rather than a synth pad playing the same notes.
+            voiceGain.gain.setValueAtTime(0.0001, startAt);
+            voiceGain.gain.linearRampToValueAtTime(targetVol, startAt + 0.006);
+            voiceGain.gain.exponentialRampToValueAtTime(Math.max(0.0001, targetVol * 0.15), startAt + 0.18);
+            voiceGain.gain.exponentialRampToValueAtTime(0.0001, startAt + 0.4);
+        } else {
+            voiceGain.gain.setValueAtTime(0.0001, startAt);
+            voiceGain.gain.linearRampToValueAtTime(targetVol, startAt + attackTime);
+            voiceGain.gain.exponentialRampToValueAtTime(Math.max(0.0001, targetVol * 0.35), startAt + attackTime + 0.1);
+            voiceGain.gain.exponentialRampToValueAtTime(0.0001, startAt + duration + releaseTime);
+        }
 
         // Genre-driven saturation for chords/bass — gives Rock (and other
         // "driven" genres) real harmonic grit instead of just a busier rhythm
         // pattern on an otherwise identical clean tone.
-        const genreDist = (GENRES[currentGenreKey] && GENRES[currentGenreKey].distortion) || 0;
+        const genreDist = genreCfgNow.distortion || 0;
         let voiceOutput = voiceFilter;
         if (genreDist > 0 && (trackName === 'chords' || trackName === 'bass')) {
             const shaper = audioCtx.createWaveShaper();
@@ -740,9 +801,6 @@
         }
         voiceOutput.connect(voiceGain);
         voiceGain.connect(masterGain);
-
-        osc.start(startAt);
-        osc.stop(startAt + duration + releaseTime + 0.05);
 
         // Record event for Multitrack MIDI exporter (with humanized velocity)
         if (isPlaying) {
@@ -778,6 +836,7 @@
             chordStyle: 'stab', compPattern: [0, 10], bassStyle: 'sustained', colorTones: 1,
             melody: { density: 4, leapWeight: 0.20, restProb: 0.55 },
             swing: 58, humanize: 42, reverbMix: 14, delayMix: 8, distortion: 0.15,
+            unisonVoices: 1, bass808: true,
             vibratoDepth: 0, vibratoRate: 5.0, tremoloDepth: 0.02, tremoloRate: 3.0, panDepth: 0.08, filterSweepDepth: 300,
             drums: { kick: [0, 7, 10], snare: [4, 12], hatClosed: [0, 2, 4, 6, 8, 10, 12, 14], hatOpen: [14] }
         },
@@ -787,6 +846,7 @@
             chordStyle: 'block', bassStyle: 'walking', colorTones: 1,
             melody: { density: 4, leapWeight: 0.15, restProb: 0.45 },
             swing: 58, humanize: 48, reverbMix: 36, delayMix: 10, flutter: true,
+            unisonVoices: 2, unisonDetune: 5,
             vibratoDepth: 4, vibratoRate: 4.2, tremoloDepth: 0.02, tremoloRate: 2.2, panDepth: 0.1, filterSweepDepth: 300,
             drums: { kick: [0, 10], snare: [4, 12], hatClosed: [0, 4, 8, 12], hatOpen: [] }
         },
@@ -796,6 +856,7 @@
             chordStyle: 'arp', bassStyle: 'pulsing', colorTones: 1,
             melody: { density: 2, leapWeight: 0.28, restProb: 0.20 },
             swing: 50, humanize: 12, reverbMix: 30, delayMix: 26,
+            unisonVoices: 3, unisonDetune: 14,
             vibratoDepth: 5, vibratoRate: 5.8, tremoloDepth: 0.02, tremoloRate: 4.0, panDepth: 0.22, filterSweepDepth: 600,
             drums: { kick: [0, 8], snare: [4, 12], hatClosed: [2, 6, 10, 14], hatOpen: [] }
         },
@@ -805,6 +866,7 @@
             chordStyle: 'sustain', bassStyle: 'rootFifth', colorTones: 0,
             melody: { density: 1, leapWeight: 0.30, restProb: 0.15 },
             swing: 50, humanize: 22, reverbMix: 42, delayMix: 0,
+            unisonVoices: 2, unisonDetune: 5,
             vibratoDepth: 6, vibratoRate: 4.8, tremoloDepth: 0.0, tremoloRate: 3.0, panDepth: 0.08, filterSweepDepth: 250,
             drums: { kick: [], snare: [], hatClosed: [], hatOpen: [] } // no kit — orchestral texture
         },
@@ -814,18 +876,21 @@
             chordStyle: 'sustain', bassStyle: 'sustained', colorTones: 2,
             melody: { density: 4, leapWeight: 0.10, restProb: 0.55 },
             swing: 50, humanize: 20, reverbMix: 62, delayMix: 30,
+            unisonVoices: 3, unisonDetune: 11,
             vibratoDepth: 3, vibratoRate: 3.6, tremoloDepth: 0.03, tremoloRate: 0.8, panDepth: 0.42, filterSweepDepth: 900, filterSweepRate: 0.025,
             drums: { kick: [0], snare: [], hatClosed: [], hatOpen: [] } // just a soft downbeat pulse
         },
         COUNTRY: {
             // Classic "boom-chick" alternating root/fifth bass, steady strummed
             // chords, and a straight train-beat kit — clean acoustic tone with
-            // no distortion or heavy processing.
+            // no distortion or heavy processing. chordEnvelope 'pluck' makes
+            // the chords decay like a strummed guitar instead of a sustained pad.
             tempo: 108, scale: 'major', wave: 'triangle', cutoff: 3800, attack: 0.02, release: 1.0, rho: 22.0,
             markov: 'functional', selfLoopBias: 0.08, harmonicRhythm: 16, startDegree: 0,
-            chordStyle: 'block', bassStyle: 'rootFifth', colorTones: 0,
+            chordStyle: 'block', chordEnvelope: 'pluck', bassStyle: 'rootFifth', colorTones: 0,
             melody: { density: 2, leapWeight: 0.22, restProb: 0.25 },
             swing: 50, humanize: 24, reverbMix: 18, delayMix: 0,
+            unisonVoices: 1,
             vibratoDepth: 5, vibratoRate: 5.0, tremoloDepth: 0.0, tremoloRate: 3.0, panDepth: 0.06, filterSweepDepth: 150,
             drums: { kick: [0, 8], snare: [4, 12], hatClosed: [0, 2, 4, 6, 8, 10, 12, 14], hatOpen: [] }
         },
@@ -839,12 +904,14 @@
             // (see drums.* below) is what actually delivers most of the "punch."
             // distortion gives it real grit — previously it was a clean
             // sawtooth just like Pop's clean square, so the two genres
-            // differed only in rhythm pattern, not actual timbre.
+            // differed only in rhythm pattern, not actual timbre. A 2-voice
+            // detuned unison thickens it further (double-tracked guitar feel).
             tempo: 132, scale: 'minor', wave: 'sawtooth', cutoff: 6000, attack: 0.006, release: 0.28, rho: 35.0,
             markov: 'functional', selfLoopBias: 0.12, harmonicRhythm: 16, startDegree: 0,
             chordStyle: 'stab', compPattern: [0, 2, 4, 6, 8, 10, 12, 14], bassStyle: 'syncopated', colorTones: 0,
             melody: { density: 2, leapWeight: 0.32, restProb: 0.20 },
             swing: 50, humanize: 18, reverbMix: 14, delayMix: 4, distortion: 0.4,
+            unisonVoices: 2, unisonDetune: 9,
             vibratoDepth: 0, vibratoRate: 5.0, tremoloDepth: 0.0, tremoloRate: 3.0, panDepth: 0.05, filterSweepDepth: 150,
             drums: { kick: [0, 6, 8, 11], snare: [4, 12], hatClosed: [0, 2, 4, 6, 8, 10, 12, 14], hatOpen: [] }
         },
@@ -857,6 +924,7 @@
             chordStyle: 'sustain', bassStyle: 'syncopated', colorTones: 2,
             melody: { density: 2, leapWeight: 0.30, restProb: 0.30 },
             swing: 60, humanize: 38, reverbMix: 30, delayMix: 8,
+            unisonVoices: 2, unisonDetune: 6,
             vibratoDepth: 6, vibratoRate: 5.2, tremoloDepth: 0.02, tremoloRate: 3.0, panDepth: 0.14, filterSweepDepth: 400,
             drums: { kick: [0, 10], snare: [4, 12], hatClosed: [0, 2, 4, 6, 8, 10, 12, 14], hatOpen: [10] }
         },
@@ -866,6 +934,7 @@
             chordStyle: 'block', bassStyle: 'rootFifth', colorTones: 0,
             melody: { density: 2, leapWeight: 0.25, restProb: 0.20 },
             swing: 50, humanize: 14, reverbMix: 22, delayMix: 10,
+            unisonVoices: 2, unisonDetune: 7,
             vibratoDepth: 4, vibratoRate: 5.2, tremoloDepth: 0.0, tremoloRate: 3.0, panDepth: 0.08, filterSweepDepth: 200,
             drums: { kick: [0, 8], snare: [4, 12], hatClosed: [0, 2, 4, 6, 8, 10, 12, 14], hatOpen: [14] }
         },
@@ -875,6 +944,7 @@
             chordStyle: 'stab', compPattern: [0, 6, 8, 14], bassStyle: 'pulsing', colorTones: 0,
             melody: { density: 1, leapWeight: 0.16, restProb: 0.18 },
             swing: 50, humanize: 6, reverbMix: 16, delayMix: 22,
+            unisonVoices: 3, unisonDetune: 20,
             vibratoDepth: 0, vibratoRate: 5.0, tremoloDepth: 0.09, tremoloRate: 6.0, panDepth: 0.18, filterSweepDepth: 700,
             drums: { kick: [0, 4, 8, 12], snare: [4, 12], hatClosed: [], hatOpen: [2, 6, 10, 14] } // classic four-on-the-floor
         }
@@ -1036,7 +1106,11 @@
             }
         } else if (style === 'sustained') {
             if (stepInBar % harmonicWindowLen === 0) {
-                playTone(clampMidi(root), 'sine', (harmonicWindowLen / 4) * 0.9, 0.14, 'bass');
+                // 808-style sub bass slide for genres that ask for it (Hip-Hop) —
+                // the note glides down into pitch instead of starting flat,
+                // which is what actually reads as "808" rather than just a
+                // held sine tone.
+                playTone(clampMidi(root), 'sine', (harmonicWindowLen / 4) * 0.9, 0.14, 'bass', { slide808: !!genreCfg.bass808 });
             }
         } else { // rootFifth / root fallback
             if (stepInBar % 8 === 0) {
@@ -1125,7 +1199,11 @@
                 }
             } else if (style === 'block') {
                 if (stepInHarmonicWindow === 0) {
-                    playChordVoicing(chordTones, (harmonicRhythm / 4) * 0.85, vol, 'chords', { strum: true, flutter: genreCfg.flutter });
+                    // Genres that want a plucked/strummed character (Country's
+                    // acoustic guitar) get a fast-decay envelope instead of a
+                    // sustained pad — same voicing/voice-leading, different
+                    // instrument character entirely.
+                    playChordVoicing(chordTones, (harmonicRhythm / 4) * 0.85, vol, 'chords', { strum: true, flutter: genreCfg.flutter, pluck: genreCfg.chordEnvelope === 'pluck' });
                 }
                 if (useSus && stepInHarmonicWindow === 2) {
                     // resolve the suspension down to the true 3rd
@@ -1259,43 +1337,15 @@
     // =========================================================================
     // AUDIO WAV RECORDING
     // =========================================================================
-    // =========================================================================
-    // AUDIO WORKLET RECORDER — replaces ScriptProcessorNode, which is
-    // deprecated specifically because repeated create/destroy cycles on it are
-    // known to be flaky in some browsers (exactly the "have to refresh before
-    // the next recording" symptom). AudioWorkletNode's processor module is
-    // registered once and can be instantiated fresh many times per session
-    // without that degradation. The module is defined inline as a Blob URL so
-    // the app stays a single self-contained HTML file — no separate .js file.
-    // =========================================================================
-    let recorderWorkletReady = false;
-    let recorderNode = null;
-
-    async function ensureRecorderWorklet() {
-        if (recorderWorkletReady) return;
-        const workletSource = `
-            class RecorderProcessor extends AudioWorkletProcessor {
-                process(inputs) {
-                    const input = inputs[0];
-                    if (input && input.length > 0 && input[0].length > 0) {
-                        const left = input[0];
-                        const right = input.length > 1 ? input[1] : input[0];
-                        this.port.postMessage({ left: left.slice(), right: right.slice() });
-                    }
-                    return true;
-                }
-            }
-            registerProcessor('recorder-processor', RecorderProcessor);
-        `;
-        const blob = new Blob([workletSource], { type: 'application/javascript' });
-        const url = URL.createObjectURL(blob);
-        try {
-            await audioCtx.audioWorklet.addModule(url);
-            recorderWorkletReady = true;
-        } finally {
-            URL.revokeObjectURL(url);
-        }
-    }
+    // ScriptProcessorNode is deprecated, but AudioWorkletNode requires a
+    // secure context (HTTPS or localhost) and fails under file:// origins —
+    // exactly how a downloaded standalone HTML file is normally opened. That
+    // was a real regression (recording silently captured nothing). Reverting
+    // to ScriptProcessorNode, which does work under file://, while keeping the
+    // recordTapGain safe-tap architecture (a separate, already-verified fix
+    // for the original "must refresh" bug caused by selective-disconnect
+    // being unreliable on some browsers).
+    let scriptNode = null;
 
     async function toggleAudioRecording() {
         await initAudio();
@@ -1307,19 +1357,19 @@
             recL = [];
             recR = [];
 
-            await ensureRecorderWorklet();
-            recorderNode = new AudioWorkletNode(audioCtx, 'recorder-processor', {
-                numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2]
-            });
-            recorderNode.port.onmessage = (e) => {
+            scriptNode = audioCtx.createScriptProcessor(4096, 2, 2);
+            scriptNode.onaudioprocess = (e) => {
                 if (!isRecordingWav) return;
-                recL.push(new Float32Array(e.data.left));
-                recR.push(new Float32Array(e.data.right));
+                const inBuf = e.inputBuffer;
+                const chL = inBuf.getChannelData(0);
+                const chR = inBuf.numberOfChannels > 1 ? inBuf.getChannelData(1) : chL;
+                recL.push(new Float32Array(chL));
+                recR.push(new Float32Array(chR));
             };
             silentSink = audioCtx.createGain();
             silentSink.gain.setValueAtTime(0, audioCtx.currentTime); // must reach destination to keep processing alive, but silently
-            recordTapGain.connect(recorderNode);
-            recorderNode.connect(silentSink);
+            recordTapGain.connect(scriptNode);
+            scriptNode.connect(silentSink);
             silentSink.connect(audioCtx.destination);
 
             isRecordingWav = true;
@@ -1336,12 +1386,12 @@
         btn.innerText = '● REC AUDIO (WAV)';
         btn.classList.remove('recording');
 
-        if (recorderNode) {
-            recorderNode.port.onmessage = null;
-            try { recordTapGain.disconnect(recorderNode); } catch (err) {}
-            try { recorderNode.disconnect(); } catch (err) {}
+        if (scriptNode) {
+            scriptNode.onaudioprocess = null;
+            try { recordTapGain.disconnect(scriptNode); } catch (err) {}
+            try { scriptNode.disconnect(); } catch (err) {}
             try { silentSink.disconnect(); } catch (err) {}
-            recorderNode = null;
+            scriptNode = null;
             silentSink = null;
         }
         exportWavFile();

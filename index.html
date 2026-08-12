@@ -551,7 +551,12 @@
         const now = audioCtx.currentTime;
         const humanizeAmt = humanizePercent / 100;
         const startAt = now + Math.random() * 0.012 * humanizeAmt;
-        const drumVol = 0.9;
+        // Rebalanced against the melodic voices, which peak around 0.08-0.19
+        // (see playTone). The kick was previously 0.9 — 5-10x louder than
+        // everything else in the mix, including the snare and hihat — which
+        // masked them almost entirely and made the mix read as one loud boomy
+        // kick regardless of genre. 0.4 keeps it punchy without burying the rest.
+        const drumVol = 0.4;
 
         if (type === 'kick') {
             const osc = audioCtx.createOscillator();
@@ -599,7 +604,7 @@
             const g = audioCtx.createGain();
             const dur = open ? 0.22 : 0.045;
             g.gain.setValueAtTime(0.0001, startAt);
-            g.gain.linearRampToValueAtTime(drumVol * (open ? 0.2 : 0.26), startAt + 0.002);
+            g.gain.linearRampToValueAtTime(drumVol * (open ? 0.35 : 0.42), startAt + 0.002);
             g.gain.exponentialRampToValueAtTime(0.001, startAt + dur);
             noise.connect(hp); hp.connect(g); g.connect(drumBus);
             noise.start(startAt); noise.stop(startAt + dur + 0.02);

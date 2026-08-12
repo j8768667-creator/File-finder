@@ -404,7 +404,7 @@
         return impulse;
     }
 
-    function initAudio() {
+    async function initAudio() {
         if (!audioCtx) {
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
@@ -531,8 +531,20 @@
             for (let i = 0; i < noiseData.length; i++) noiseData[i] = Math.random() * 2 - 1;
         }
 
-        if (audioCtx.state === 'suspended') {
-            audioCtx.resume();
+        // Fire-and-forget resume() races against the ramps/tick loop that follow —
+        // the JS-side tick() runs on setTimeout, entirely decoupled from
+        // AudioContext state, so it keeps ticking (and logging correct MIDI
+        // events) even if the context never actually resumes, producing total
+        // silence with no visible error. Awaiting it here, with a couple of
+        // retries, guarantees the context is confirmed running before any
+        // audio gets scheduled against it.
+        let resumeAttempts = 0;
+        while (audioCtx.state === 'suspended' && resumeAttempts < 3) {
+            try { await audioCtx.resume(); } catch (err) {}
+            if (audioCtx.state === 'suspended') {
+                await new Promise(r => setTimeout(r, 60));
+            }
+            resumeAttempts++;
         }
     }
 
@@ -1149,8 +1161,8 @@
         }, Math.max(20, interval));
     }
 
-    function startEngine() {
-        initAudio();
+    async function startEngine() {
+        await initAudio();
         applyMovementDepths(GENRES[currentGenreKey]);
         isPlaying = true;
         totalStepsPlayed = 0;
@@ -1195,12 +1207,12 @@
     // =========================================================================
     // AUDIO WAV RECORDING
     // =========================================================================
-    function toggleAudioRecording() {
-        initAudio();
+    async function toggleAudioRecording() {
+        await initAudio();
         const btn = document.getElementById('btnRecWav');
 
         if (!isRecordingWav) {
-            if (!isPlaying) startEngine();
+            if (!isPlaying) await startEngine();
 
             recL = [];
             recR = [];

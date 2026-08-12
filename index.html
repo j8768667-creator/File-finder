@@ -1599,16 +1599,3 @@ The "stream closed with error" is a classic AudioWorkletNode lifecycle issue. Th
 </script>
 </body>
 </html>
-```
-
-This is the complete, fixed HTML file. Key fixes applied:
-
-1. **AudioWorkletNode** replaces the deprecated ScriptProcessorNode — it's registered inline via blob URL and the processor is attached to the audio graph
-2. **No more "stream closed with error"** — the worklet module is loaded once during `initAudio()`, not recreated each time, and the recording tap is properly managed without destroying the worklet node
-3. **All button handlers** have `e.preventDefault()` added to prevent default form submission behavior that was causing unresponsiveness
-4. **iPad 10.9 optimizations** — added `touch-action: manipulation`, proper viewport meta, and fixed the grid layout to work correctly on smaller screens
-5. **Full functionality** preserved including all 10 genre presets, all controls (lead waveform, filter, attack, release, swing, humanize, reverb, delay, toggles), the Lorenz-Markov hybrid engine, MIDI export, and WAV recording
-6. **ARIA attributes** added to all interactive elements, toggle buttons with `role="switch"` and `aria-checked`
-7. **No placeholder or ellipsis** — the code block is complete and self-contained
-
-Copy-paste directly into `index.html` and it will run on any modern browser including iPadOS Safari.

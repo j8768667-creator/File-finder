@@ -354,7 +354,121 @@ function parseChordSequence(text){
     .filter(Boolean);
 }
 
-/* ---------------- HELPERS ---------------- */
+/* ---------------- MIDI FILE IMPORT (parse .mid -> chord sequence) ---------------- */
+function parseMidiFile(arrayBuffer){
+  const data = new Uint8Array(arrayBuffer);
+  let pos = 0;
+  function readStr(n){ let s=''; for(let i=0;i<n;i++) s+=String.fromCharCode(data[pos++]); return s; }
+  function readU32(){ const v=(data[pos]<<24)|(data[pos+1]<<16)|(data[pos+2]<<8)|data[pos+3]; pos+=4; return v>>>0; }
+  function readU16(){ const v=(data[pos]<<8)|data[pos+1]; pos+=2; return v; }
+  function readVarLen(){
+    let value=0, b;
+    do{ b=data[pos++]; value=(value<<7)|(b&0x7F); } while(b&0x80);
+    return value;
+  }
+  const magic = readStr(4);
+  if(magic!=='MThd') throw new Error('Not a standard MIDI file (missing MThd header).');
+  const hdrLen = readU32();
+  const format = readU16();
+  const ntrks = readU16();
+  const division = readU16();
+  if(division & 0x8000) throw new Error('SMPTE-timecode MIDI files are not supported.');
+  const ppq = division;
+  pos += Math.max(0, hdrLen-6);
+
+  const allNotes = [];
+  for(let t=0; t<ntrks; t++){
+    if(pos+8>data.length) break;
+    const trkMagic = readStr(4);
+    if(trkMagic !== 'MTrk') throw new Error('Malformed MIDI file (expected MTrk chunk).');
+    const trkLen = readU32();
+    const trkEnd = pos+trkLen;
+    let tick = 0;
+    let runningStatus = null;
+    const openNotes = {};
+    while(pos < trkEnd){
+      const delta = readVarLen();
+      tick += delta;
+      let status = data[pos];
+      if(status & 0x80){ pos++; runningStatus = status; }
+      else { status = runningStatus; }
+      if(status === 0xFF){
+        pos++; // meta type
+        const len = readVarLen();
+        pos += len;
+      } else if(status===0xF0 || status===0xF7){
+        const len = readVarLen();
+        pos += len;
+      } else {
+        const hi = status & 0xF0;
+        const channel = status & 0x0F;
+        if(hi===0x90 || hi===0x80){
+          const note = data[pos++];
+          const vel = data[pos++];
+          const key = channel+'_'+note;
+          if(hi===0x90 && vel>0){
+            openNotes[key] = tick;
+          } else if(openNotes[key] !== undefined){
+            allNotes.push({ startTick:openNotes[key], endTick:tick, midi:note, channel });
+            delete openNotes[key];
+          }
+        } else if(hi===0xA0 || hi===0xB0 || hi===0xE0){
+          pos += 2;
+        } else if(hi===0xC0 || hi===0xD0){
+          pos += 1;
+        } else {
+          pos = trkEnd; // unrecognized status byte; bail out of this track safely
+        }
+      }
+    }
+    pos = trkEnd;
+  }
+  if(!allNotes.length) throw new Error('No playable notes found in that MIDI file.');
+  return { ppq, notes: allNotes };
+}
+function guessChordQuality(intervals){
+  const set = new Set(intervals.map(iv=>((iv%12)+12)%12));
+  let bestKey='', bestScore=-Infinity;
+  for(const key of Object.keys(QUALITY_INTERVALS)){
+    const ivs = QUALITY_INTERVALS[key];
+    const ivSet = new Set(ivs.map(v=>v%12));
+    let match=0; ivSet.forEach(v=>{ if(set.has(v)) match++; });
+    const score = match*2 - Math.abs(ivSet.size-set.size);
+    if(score>bestScore){ bestScore=score; bestKey=key; }
+  }
+  return bestKey;
+}
+// Groups extracted note events into one chord per bar and reconstructs
+// readable chord symbols (e.g. "C", "Am7") that feed the same custom-chord
+// text pipeline used for typed input.
+function midiFileToChordSymbols(parsed, maxBars=16){
+  const { ppq, notes } = parsed;
+  const ticksPerBar = ppq*4;
+  const pitched = notes.filter(n=> n.channel!==9); // exclude the drum channel
+  const pool = pitched.length ? pitched : notes;
+  const maxTick = Math.max(...pool.map(n=>n.endTick));
+  const totalBars = Math.min(maxBars, Math.max(1, Math.ceil(maxTick/ticksPerBar)));
+  const symbols = [];
+  let lastSymbol = null;
+  for(let bar=0; bar<totalBars; bar++){
+    const barStart = bar*ticksPerBar, barEnd = barStart+ticksPerBar;
+    const inBar = pool.filter(n=> n.startTick < barEnd && n.endTick > barStart);
+    if(!inBar.length){ symbols.push(lastSymbol || 'C'); continue; }
+    const uniquePitches = [...new Set(inBar.map(n=>n.midi))].sort((a,b)=>a-b);
+    const chosen = uniquePitches.slice(0,6);
+    const rootMidi = chosen[0];
+    const rootPc = ((rootMidi%12)+12)%12;
+    const intervals = [...new Set(chosen.map(p=>p-rootMidi))];
+    if(!intervals.includes(0)) intervals.unshift(0);
+    const quality = guessChordQuality(intervals);
+    const symbol = NOTE_NAMES[rootPc] + quality;
+    symbols.push(symbol);
+    lastSymbol = symbol;
+  }
+  return symbols;
+}
+
+
 function weightedChoice(weights){
   const sum = weights.reduce((a,b)=>a+b,0);
   let r = Math.random()*sum;
@@ -979,11 +1093,28 @@ function encodeWAV(audioBuffer){
   }
   return new Blob([buffer], {type:'audio/wav'});
 }
+const _pendingBlobUrls = {};
 function downloadBlob(blob, filename){
+  // iOS Safari's "Save to Files" / share-sheet flow reads the blob
+  // asynchronously and can take much longer than a normal desktop download
+  // to actually complete. Revoking the object URL too early (previously
+  // 500ms) truncates or empties the saved file, which is why it later shows
+  // up as unreadable / greyed out when another app tries to import it.
+  if(_pendingBlobUrls[filename]){
+    clearTimeout(_pendingBlobUrls[filename].timer);
+    URL.revokeObjectURL(_pendingBlobUrls[filename].url);
+  }
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href=url; a.download=filename; document.body.appendChild(a); a.click();
-  setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 500);
+  a.href = url; a.download = filename; a.rel = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(()=>{ a.remove(); }, 1000);
+  const timer = setTimeout(()=>{
+    URL.revokeObjectURL(url);
+    delete _pendingBlobUrls[filename];
+  }, 60000);
+  _pendingBlobUrls[filename] = { url, timer };
 }
 
 /* ---------------- PIANO ROLL RENDER + EDITING ---------------- */
@@ -1236,24 +1367,46 @@ function renderGenerateTab(container){
       <textarea id="chordText" rows="2" placeholder="e.g. C G Am F   or   Cmaj7 Dm7 G7 Cmaj7" style="width:100%;background:var(--panel2);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:9px 10px;font-size:13px;font-family:var(--mono);resize:vertical;">${uiState.customChordsText}</textarea>
     </div>
     <div class="field">
-      <input type="file" id="chordFile" accept=".txt,text/plain">
+      <input type="file" id="chordFile" accept=".txt,text/plain,.mid,.midi,audio/midi,audio/x-midi">
     </div>
-    <div class="small-note">Root + quality, space or comma separated (maj, m, 7, maj7, m7, dim, sus4, 6, 9, etc). This still runs through the genre's bass, melody, and drum generation — only the harmony comes from your text.</div>`;
+    <div class="small-note">Root + quality, space or comma separated (maj, m, 7, maj7, m7, dim, sus4, 6, 9, etc). Or upload a .txt chord list or a .mid file — a MIDI file's harmony is extracted bar-by-bar and written into the box below as chord symbols you can edit. Either way this still runs through the genre's bass, melody, and drum generation — only the harmony comes from your input.</div>`;
   container.appendChild(p2b);
   p2b.querySelector('#useCustomChk').onchange=e=>{ uiState.useCustomChords=e.target.checked; };
   p2b.querySelector('#chordText').oninput=e=>{ uiState.customChordsText=e.target.value; };
   p2b.querySelector('#chordFile').onchange=(e)=>{
     const file = e.target.files[0];
     if(!file) return;
-    const reader = new FileReader();
-    reader.onload = ()=>{
-      uiState.customChordsText = reader.result;
-      p2b.querySelector('#chordText').value = reader.result;
-      uiState.useCustomChords = true;
-      p2b.querySelector('#useCustomChk').checked = true;
-      logMessage(`Loaded chord sequence from ${file.name}.`);
-    };
-    reader.readAsText(file);
+    const isMidi = /\.midi?$/i.test(file.name) || file.type==='audio/midi' || file.type==='audio/x-midi';
+    if(isMidi){
+      const reader = new FileReader();
+      reader.onload = ()=>{
+        try{
+          const parsed = parseMidiFile(reader.result);
+          const symbols = midiFileToChordSymbols(parsed, uiState.bars);
+          const text = symbols.join(' ');
+          uiState.customChordsText = text;
+          p2b.querySelector('#chordText').value = text;
+          uiState.useCustomChords = true;
+          p2b.querySelector('#useCustomChk').checked = true;
+          logMessage(`Extracted ${symbols.length}-bar chord sequence from ${file.name}: ${text}`);
+        } catch(err){
+          logMessage(`Could not read that MIDI file: ${err.message}`);
+        }
+      };
+      reader.onerror = ()=> logMessage(`Could not read ${file.name}.`);
+      reader.readAsArrayBuffer(file);
+    } else {
+      const reader = new FileReader();
+      reader.onload = ()=>{
+        uiState.customChordsText = reader.result;
+        p2b.querySelector('#chordText').value = reader.result;
+        uiState.useCustomChords = true;
+        p2b.querySelector('#useCustomChk').checked = true;
+        logMessage(`Loaded chord sequence from ${file.name}.`);
+      };
+      reader.onerror = ()=> logMessage(`Could not read ${file.name}.`);
+      reader.readAsText(file);
+    }
   };
 
   const p3 = document.createElement('div'); p3.className='panel';

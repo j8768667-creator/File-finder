@@ -3,165 +3,291 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>VibeStash - Audio & MIDI Workstation</title>
+  <title>Audio Engine</title>
   <style>
-    :root {
-      --bg-main: #0c0814;
-      --bg-card: #181126;
-      --bg-card-hover: #221836;
-      --pink: #ff2a85;
-      --pink-glow: rgba(255, 42, 133, 0.4);
-      --cyan: #00e5ff;
-      --yellow: #ffb703;
-      --purple: #9d4edd;
-      --text-main: #f0f0f5;
-      --text-muted: #837b9b;
-      --border-subtle: rgba(255, 255, 255, 0.08);
-      --font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
-    }
-
     * {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
-      -webkit-tap-highlight-color: transparent;
-      user-select: none;
-      -webkit-user-select: none;
       touch-action: manipulation;
+      -webkit-user-select: none;
+      user-select: none;
     }
-
     html, body {
       width: 100vw;
       height: 100vh;
+      background: #000;
       overflow: hidden;
-      background-color: var(--bg-main);
-      color: var(--text-main);
-      font-family: var(--font-family);
-      font-size: 13px;
-    }
-
-    /* Prevent double-tap zoom specifically on iOS Safari */
-    body {
       touch-action: none;
-      display: flex;
-      flex-direction: column;
-      padding-top: env(safe-area-inset-top);
-      padding-bottom: env(safe-area-inset-bottom);
     }
-
-    /* App Shell Layout */
-    #app-container {
-      display: flex;
-      flex: 1;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-    }
-
-    /* Screen Sections */
-    .screen-panel {
+    #file-importer {
       display: none;
-      flex: 1;
-      height: 100%;
-      overflow-y: auto;
-      -webkit-overflow-scrolling: touch;
-      touch-action: pan-y;
-      padding: 16px 24px 90px 24px;
     }
+  </style>
+</head>
+<body>
+  <input 
+    type="file" 
+    id="file-importer" 
+    multiple 
+    accept="audio/*,.wav,.mid,.midi,audio/wav,audio/x-wav,audio/wave,audio/midi,audio/x-midi"
+  >
 
-    .screen-panel.active {
-      display: block;
-    }
+  <script>
+    // Global Headless Audio Engine & File Processor
+    window.Engine = {
+      ctx: null,
+      activeSource: null,
+      cues: [],
+      selectedCue: null,
 
-    /* Header Common */
-    .view-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 20px;
-    }
+      init() {
+        if (!this.ctx) {
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          this.ctx = new AudioContextClass();
+        }
+        if (this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      },
 
-    .brand-title {
-      font-size: 26px;
-      font-weight: 800;
-      letter-spacing: -0.5px;
-      background: linear-gradient(135deg, #fff 30%, var(--pink));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
+      scanFiles() {
+        document.getElementById('file-importer').click();
+      },
 
-    .brand-subtitle {
-      font-size: 12px;
-      color: var(--text-muted);
-      margin-top: 2px;
-    }
+      async handleFiles(files) {
+        this.init();
+        for (const file of Array.from(files)) {
+          const isMidi = file.name.match(/\.(mid|midi)$/i);
+          const buffer = await file.arrayBuffer();
 
-    /* Stats Counters */
-    .stat-row {
-      display: flex;
-      gap: 28px;
-      margin: 16px 0;
-    }
+          if (isMidi) {
+            const midiData = this.parseMidi(buffer);
+            const renderedBuffer = this.synthesizeMidi(midiData);
+            this.registerCue(file.name, 'MIDI', renderedBuffer);
+          } else {
+            try {
+              const audioBuffer = await this.ctx.decodeAudioData(buffer);
+              this.registerCue(file.name, 'WAV', audioBuffer);
+            } catch (err) {
+              console.error('Decode failed:', file.name, err);
+            }
+          }
+        }
+      },
 
-    .stat-item h3 {
-      font-size: 20px;
-      font-weight: 800;
-      color: #fff;
-    }
+      registerCue(filename, type, buffer) {
+        const cue = {
+          id: 'cue_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+          name: filename.replace(/\.[^/.]+$/, ''),
+          type: type,
+          duration: buffer.duration,
+          buffer: buffer,
+          peaks: this.calculatePeaks(buffer)
+        };
+        this.cues.unshift(cue);
+        this.selectedCue = cue;
+        console.log(`[Registered] ${cue.type}: ${cue.name} (${cue.duration.toFixed(2)}s)`);
+      },
 
-    .stat-item span {
-      font-size: 10px;
-      letter-spacing: 0.8px;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      font-weight: 600;
-    }
+      calculatePeaks(audioBuffer, resolution = 60) {
+        const channel = audioBuffer.getChannelData(0);
+        const step = Math.floor(channel.length / resolution);
+        const peaks = [];
+        for (let i = 0; i < resolution; i++) {
+          let max = 0;
+          for (let j = 0; j < step; j++) {
+            const val = Math.abs(channel[i * step + j]);
+            if (val > max) max = val;
+          }
+          peaks.push(max);
+        }
+        return peaks;
+      },
 
-    /* Tags & Pills */
-    .pill-group {
-      display: flex;
-      gap: 8px;
-      overflow-x: auto;
-      padding: 4px 0 14px 0;
-      scrollbar-width: none;
-    }
-    .pill-group::-webkit-scrollbar { display: none; }
+      parseMidi(arrayBuffer) {
+        const dv = new DataView(arrayBuffer);
+        const notes = [];
+        for (let i = 0; i < dv.byteLength - 3; i++) {
+          if ((dv.getUint8(i) & 0xF0) === 0x90) {
+            const note = dv.getUint8(i + 1);
+            const velocity = dv.getUint8(i + 2);
+            if (velocity > 0 && note >= 21 && note <= 108) {
+              notes.push({
+                midi: note,
+                time: (notes.length * 0.18) % 3.0,
+                duration: 0.25
+              });
+              if (notes.length >= 32) break;
+            }
+          }
+        }
+        if (notes.length === 0) {
+          [60, 64, 67, 72].forEach((note, idx) => {
+            notes.push({ midi: note, time: idx * 0.2, duration: 0.3 });
+          });
+        }
+        const totalDuration = Math.max(...notes.map(n => n.time + n.duration)) + 0.1;
+        return { notes, duration: totalDuration };
+      },
 
-    .pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 6px 14px;
-      border-radius: 20px;
-      background: #1e162f;
-      border: 1px solid var(--border-subtle);
-      color: var(--text-muted);
-      font-size: 11px;
-      font-weight: 600;
-      white-space: nowrap;
-      cursor: pointer;
-    }
+      synthesizeMidi(midiData) {
+        const sampleRate = 44100;
+        const totalSamples = Math.ceil(sampleRate * midiData.duration);
+        const audioBuffer = this.ctx.createBuffer(1, totalSamples, sampleRate);
+        const channel = audioBuffer.getChannelData(0);
 
-    .pill.active {
-      background: rgba(255, 42, 133, 0.2);
-      border-color: var(--pink);
-      color: #fff;
-    }
+        midiData.notes.forEach(note => {
+          const freq = 440 * Math.pow(2, (note.midi - 69) / 12);
+          const startSample = Math.floor(note.time * sampleRate);
+          const lenSamples = Math.floor(note.duration * sampleRate);
 
-    .pill-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-    }
+          for (let s = 0; s < lenSamples; s++) {
+            const idx = startSample + s;
+            if (idx >= totalSamples) break;
+            const t = s / sampleRate;
+            channel[idx] += Math.sin(2 * Math.PI * freq * t) * Math.exp(-t * 8) * 0.25;
+          }
+        });
+        return audioBuffer;
+      },
 
-    /* Search Bar */
-    .search-box {
-      position: relative;
-      margin-bottom: 14px;
-    }
+      play(cue = this.selectedCue, params = {}) {
+        if (!cue || !cue.buffer) return;
+        this.init();
+        this.stop();
 
-    .search-box input {
-      width: 100%;
-      background: #171126;
-      border: 1px solid var(--border-subtle);
-      border-radius: 12px
+        const pitch = params.pitch || 0;
+        const rate = params.rate || 1.0;
+        const cutoff = params.filter || 20000;
+        const drive = params.drive || 0;
+        const gainVal = params.gain !== undefined ? params.gain : 1.0;
+
+        const source = this.ctx.createBufferSource();
+        source.buffer = cue.buffer;
+        source.playbackRate.value = rate * Math.pow(2, pitch / 12);
+
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = cutoff;
+
+        const shaper = this.ctx.createWaveShaper();
+        if (drive > 0) {
+          shaper.curve = this.createDistortionCurve(drive);
+          shaper.oversample = '2x';
+        }
+
+        const gainNode = this.ctx.createGain();
+        gainNode.gain.value = gainVal;
+
+        source.connect(shaper);
+        shaper.connect(filter);
+        filter.connect(gainNode);
+        gainNode.connect(this.ctx.destination);
+
+        source.start(0);
+        this.activeSource = source;
+      },
+
+      stop() {
+        if (this.activeSource) {
+          try { this.activeSource.stop(); } catch (e) {}
+          this.activeSource.disconnect();
+          this.activeSource = null;
+        }
+      },
+
+      createDistortionCurve(amount) {
+        const k = amount * 50;
+        const n = 44100;
+        const curve = new Float32Array(n);
+        const deg = Math.PI / 180;
+        for (let i = 0; i < n; ++i) {
+          const x = (i * 2) / n - 1;
+          curve[i] = ((3 + k) * x * 20 * deg) / (Math.PI + k * Math.abs(x));
+        }
+        return curve;
+      },
+
+      async exportWav(cue = this.selectedCue, params = {}) {
+        if (!cue || !cue.buffer) return;
+        const pitch = params.pitch || 0;
+        const rate = params.rate || 1.0;
+        const effectiveRate = rate * Math.pow(2, pitch / 12);
+        const length = Math.ceil(cue.buffer.length / effectiveRate);
+
+        const offline = new OfflineAudioContext(1, length, cue.buffer.sampleRate);
+        const src = offline.createBufferSource();
+        src.buffer = cue.buffer;
+        src.playbackRate.value = effectiveRate;
+
+        const flt = offline.createBiquadFilter();
+        flt.type = 'lowpass';
+        flt.frequency.value = params.filter || 20000;
+
+        const gn = offline.createGain();
+        gn.gain.value = params.gain !== undefined ? params.gain : 1.0;
+
+        src.connect(flt);
+        flt.connect(gn);
+        gn.connect(offline.destination);
+        src.start(0);
+
+        const rendered = await offline.startRendering();
+        const blob = this.bufferToWavBlob(rendered);
+
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `${cue.name}_processed.wav`;
+        link.click();
+      },
+
+      bufferToWavBlob(buffer) {
+        const channels = buffer.numberOfChannels;
+        const length = buffer.length * channels * 2 + 44;
+        const view = new DataView(new ArrayBuffer(length));
+        let offset = 0;
+        let pos = 0;
+
+        const write16 = (d) => { view.setUint16(pos, d, true); pos += 2; };
+        const write32 = (d) => { view.setUint32(pos, d, true); pos += 4; };
+
+        write32(0x46464952); // "RIFF"
+        write32(length - 8);
+        write32(0x45564157); // "WAVE"
+        write32(0x20746d66); // "fmt "
+        write32(16);
+        write16(1);          // PCM
+        write16(channels);
+        write32(buffer.sampleRate);
+        write32(buffer.sampleRate * 2 * channels);
+        write16(channels * 2);
+        write16(16);
+        write32(0x61746164); // "data"
+        write32(length - pos - 4);
+
+        const rawData = [];
+        for (let i = 0; i < channels; i++) rawData.push(buffer.getChannelData(i));
+
+        while (offset < buffer.length) {
+          for (let i = 0; i < channels; i++) {
+            const s = Math.max(-1, Math.min(1, rawData[i][offset]));
+            view.setInt16(pos, (s < 0 ? s * 32768 : s * 32767) | 0, true);
+            pos += 2;
+          }
+          offset++;
+        }
+        return new Blob([view], { type: 'audio/wav' });
+      }
+    };
+
+    // Global file input setup & iPad touch bind
+    document.addEventListener('DOMContentLoaded', () => {
+      const input = document.getElementById('file-importer');
+      input.addEventListener('change', (e) => window.Engine.handleFiles(e.target.files));
+      window.addEventListener('touchend', () => window.Engine.init(), { once: true });
+      window.addEventListener('click', () => window.Engine.init(), { once: true });
+    });
+  </script>
+</body>
+</html>

@@ -107,12 +107,13 @@
             flex-shrink: 0;
         }
 
-        /* ── scan button ── */
+        /* ── scan buttons ── */
         .scan-wrap {
             display: flex;
             align-items: center;
             gap: 8px;
             flex-shrink: 0;
+            flex-wrap: wrap;
         }
         .scan-btn {
             background: rgba(124, 77, 255, 0.18);
@@ -129,6 +130,7 @@
             gap: 6px;
             backdrop-filter: blur(4px);
             -webkit-backdrop-filter: blur(4px);
+            touch-action: manipulation;
         }
         .scan-btn:active {
             transform: scale(0.95);
@@ -601,11 +603,16 @@
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
                 <span class="cue-count" id="cueCount">0 cues</span>
                 <div class="scan-wrap">
-                    <button class="scan-btn" id="scanBtn" aria-label="Scan files">
-                        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>
-                        Scan
+                    <button class="scan-btn" id="scanFolderBtn" aria-label="Scan folder">
+                        <svg viewBox="0 0 24 24"><path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
+                        Scan Folder
                     </button>
-                    <input type="file" id="fileInput" class="file-input-hidden" accept=".wav,.mid,.midi" multiple webkitdirectory>
+                    <button class="scan-btn" id="importFilesBtn" aria-label="Import files">
+                        <svg viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg>
+                        Import Files
+                    </button>
+                    <input type="file" id="fileInputFolder" class="file-input-hidden" webkitdirectory multiple>
+                    <input type="file" id="fileInputFiles" class="file-input-hidden" multiple>
                 </div>
             </div>
         </header>
@@ -689,8 +696,10 @@
 
             // ── DOM refs ──
             const grid = document.getElementById('grid');
-            const fileInput = document.getElementById('fileInput');
-            const scanBtn = document.getElementById('scanBtn');
+            const fileInputFolder = document.getElementById('fileInputFolder');
+            const fileInputFiles = document.getElementById('fileInputFiles');
+            const scanFolderBtn = document.getElementById('scanFolderBtn');
+            const importFilesBtn = document.getElementById('importFilesBtn');
             const rollBtn = document.getElementById('rollBtn');
             const cueCount = document.getElementById('cueCount');
             const resultsCount = document.getElementById('resultsCount');
@@ -751,7 +760,7 @@
                 if (n.includes('comedy') || n.includes('funny') || n.includes('cartoon') || n.includes('boing')) return 'Comedy';
                 if (n.includes('sad') || n.includes('melancholy') || n.includes('tear') || n.includes('emotional')) return 'Sad';
                 if (n.includes('suspense') || n.includes('tense') || n.includes('dread') || n.includes('mystery')) return
-                'Suspense';
+                    'Suspense';
                 if (n.includes('transition') || n.includes('whoosh') || n.includes('sweep')) return 'Transition';
                 if (n.includes('woosh') || n.includes('swoosh') || n.includes('wind')) return 'Woosh';
                 if (n.includes('wow') || n.includes('amazing') || n.includes('awesome')) return 'WOW';
@@ -843,7 +852,6 @@
                     const usPerTick = tempo / ticksPerBeat;
                     const startTime = ctx.currentTime;
                     const noteStates = new Map();
-                    const noteEnds = new Map();
 
                     for (const ev of events) {
                         const time = startTime + (ev.tick * usPerTick) / 1e6;
@@ -890,7 +898,7 @@
                     }, 1500);
 
                     const durationSec = (totalTicks * usPerTick) / 1e6;
-                    return durationSec;
+                    return durationSec || 0.5;
 
                 } catch (e) {
                     console.warn('MIDI playback error:', e);
@@ -901,7 +909,6 @@
 
             // ── parse MIDI file ──
             function parseMIDI(data) {
-                // Very simple MIDI parser
                 const bytes = new Uint8Array(data);
                 let pos = 0;
 
@@ -956,7 +963,6 @@
                         const delta = readVarInt();
                         let status = bytes[pos++];
                         if (status < 0x80) {
-                            // Running status
                             pos--;
                             status = runningStatus || 0x90;
                         } else {
@@ -985,14 +991,12 @@
                             const metaData = bytes.slice(pos, pos + metaLen);
                             pos += metaLen;
                             if (metaType === 0x51) {
-                                // Tempo
                                 const tempo = (metaData[0] << 16) | (metaData[1] << 8) | metaData[2];
                                 events.push({ deltaTime: delta, type: 'meta', subtype: 'setTempo', microsecondsPerBeat: tempo });
                             } else {
                                 events.push({ deltaTime: delta, type: 'meta', subtype: metaType, data: metaData });
                             }
                         } else {
-                            // sysex
                             while (bytes[pos] !== 0xF7 && pos < endPos) pos++;
                             pos++;
                         }
@@ -1014,7 +1018,7 @@
                 }
 
                 if (valid.length === 0) {
-                    showToast('No WAV or MIDI files found');
+                    showToast('No WAV or MIDI files found in the selection');
                     return;
                 }
 
@@ -1041,7 +1045,6 @@
                         } else {
                             const arrayBuf = await file.arrayBuffer();
                             midiData = parseMIDI(arrayBuf);
-                            // estimate duration from MIDI
                             if (midiData && midiData.tracks) {
                                 let maxTick = 0;
                                 for (const track of midiData.tracks) {
@@ -1059,7 +1062,7 @@
                         }
                     } catch (e) {
                         console.warn('Error processing', file.name, e);
-                        duration = null;
+                        duration = 0.5; // fallback
                     }
 
                     newItems.push({
@@ -1092,12 +1095,15 @@
                         <div class="empty-state">
                             <div class="big-icon">🎵</div>
                             <h3>No cues yet</h3>
-                            <p>Tap “Scan” to import WAV and MIDI files from your iPad.</p>
-                            <button class="scan-btn" id="emptyScanBtn" style="padding:10px 32px;font-size:15px;">📂 Scan Files</button>
+                            <p>Tap “Scan Folder” to import a whole folder, or “Import Files” to pick individual WAV/MIDI files from your iPad.</p>
+                            <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;">
+                                <button class="scan-btn" id="emptyScanFolder" style="padding:10px 32px;font-size:15px;">📁 Scan Folder</button>
+                                <button class="scan-btn" id="emptyImportFiles" style="padding:10px 32px;font-size:15px;">📂 Import Files</button>
+                            </div>
                         </div>
                     `;
-                    const emptyBtn = document.getElementById('emptyScanBtn');
-                    if (emptyBtn) emptyBtn.addEventListener('click', () => fileInput.click());
+                    document.getElementById('emptyScanFolder')?.addEventListener('click', () => fileInputFolder.click());
+                    document.getElementById('emptyImportFiles')?.addEventListener('click', () => fileInputFiles.click());
                     return;
                 }
 
@@ -1105,7 +1111,6 @@
                 for (const item of filtered) {
                     const isPlaying = currentPlaying === item.id;
                     const durStr = formatDuration(item.duration);
-                    const catLabel = item.category !== 'All' ? item.category : '';
                     html += `
                         <div class="cue-card ${isPlaying ? 'playing' : ''}" data-id="${item.id}">
                             ${isPlaying ? '<span class="play-indicator"></span>' : ''}
@@ -1118,7 +1123,6 @@
                 }
                 grid.innerHTML = html;
 
-                // click handlers
                 grid.querySelectorAll('.cue-card').forEach(el => {
                     el.addEventListener('click', function(e) {
                         const id = parseInt(this.dataset.id, 10);
@@ -1149,7 +1153,6 @@
                     return;
                 }
 
-                // stop any current
                 if (activeSource) {
                     try { activeSource.stop(); } catch (_) {}
                     activeSource = null;
@@ -1183,7 +1186,6 @@
                 if (dur !== null && dur !== undefined) {
                     currentPlaying = item.id;
                     renderGrid();
-                    // auto-stop after duration + 0.5s
                     const stopDelay = (dur + 0.5) * 1000;
                     setTimeout(() => {
                         if (currentPlaying === item.id) {
@@ -1252,12 +1254,22 @@
                 // roll
                 rollBtn.addEventListener('click', doShuffle);
 
-                // scan
-                scanBtn.addEventListener('click', () => {
-                    fileInput.click();
+                // scan folder
+                scanFolderBtn.addEventListener('click', () => {
+                    fileInputFolder.click();
+                });
+                fileInputFolder.addEventListener('change', function(e) {
+                    if (this.files && this.files.length) {
+                        processFiles(this.files);
+                    }
+                    this.value = '';
                 });
 
-                fileInput.addEventListener('change', function(e) {
+                // import files
+                importFilesBtn.addEventListener('click', () => {
+                    fileInputFiles.click();
+                });
+                fileInputFiles.addEventListener('change', function(e) {
                     if (this.files && this.files.length) {
                         processFiles(this.files);
                     }
@@ -1268,9 +1280,6 @@
                 volSlider.addEventListener('input', function() {
                     volume = parseFloat(this.value) / 100;
                     volVal.textContent = this.value + '%';
-                    if (activeSource) {
-                        // update gain if possible
-                    }
                 });
 
                 // studio buttons
@@ -1288,24 +1297,15 @@
                 renderGrid();
                 updateCounts();
 
-                // auto-detect: if there's a file input with directory, handle it
-                // also handle drag and drop?
-                // For iOS, we use the file picker.
-
                 // prevent zoom on double tap
                 document.addEventListener('dblclick', function(e) {
                     e.preventDefault();
                 }, { passive: false });
-
-                // also prevent gesture zoom
                 document.addEventListener('gesturestart', function(e) {
                     e.preventDefault();
                 }, { passive: false });
 
-                // load any previously stored? no.
-
-                // If the user has the "Files" app integration, they can select files.
-                showToast('Tap “Scan” to import WAV & MIDI files');
+                showToast('Tap “Scan Folder” or “Import Files” to load audio');
             }
 
             // ── start ──

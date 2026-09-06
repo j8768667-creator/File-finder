@@ -1,698 +1,1322 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-  <meta name="theme-color" content="#101828" />
-  <title>iPad File Finder</title>
-  <style>
-    :root {
-      --bg: #f2f4f7;
-      --panel: #ffffff;
-      --text: #101828;
-      --muted: #667085;
-      --line: #d0d5dd;
-      --accent: #175cd3;
-      --accent-dark: #1849a9;
-      --danger: #b42318;
-      --success: #067647;
-      --radius: 16px;
-      --shadow: 0 8px 24px rgba(16,24,40,.08);
-    }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>VibeStash</title>
+    <style>
+        /* ── Reset & base ── */
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
 
-    * { box-sizing: border-box; }
+        html,
+        body {
+            height: 100%;
+            background: #0b0b12;
+            color: #f0edf5;
+            font-family: -apple-system, 'Inter', 'SF Pro Display', system-ui, sans-serif;
+            font-weight: 400;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            touch-action: manipulation;
+            overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+        }
 
-    html, body {
-      margin: 0;
-      min-height: 100%;
-      background: var(--bg);
-      color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      -webkit-text-size-adjust: 100%;
-    }
+        /* prevent double-tap zoom */
+        button,
+        a,
+        [role="button"] {
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
 
-    body {
-      padding:
-        calc(16px + env(safe-area-inset-top))
-        calc(16px + env(safe-area-inset-right))
-        calc(24px + env(safe-area-inset-bottom))
-        calc(16px + env(safe-area-inset-left));
-    }
+        /* ── scrollbar ── */
+        ::-webkit-scrollbar {
+            width: 4px;
+            height: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #4a3a6a;
+            border-radius: 20px;
+        }
 
-    .app {
-      width: min(1200px, 100%);
-      margin: 0 auto;
-    }
+        /* ── layout ── */
+        #app {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            height: 100dvh;
+            max-width: 1024px;
+            margin: 0 auto;
+            padding: 16px 18px 12px;
+            background: radial-gradient(ellipse at 20% 0%, #16112a 0%, #0b0b12 70%);
+            overflow: hidden;
+        }
 
-    header {
-      margin-bottom: 16px;
-    }
+        /* ── header ── */
+        .header {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            flex-shrink: 0;
+        }
+        .header-left {
+            display: flex;
+            align-items: baseline;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .logo {
+            font-size: 24px;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            background: linear-gradient(135deg, #b388ff, #7c4dff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .logo-sub {
+            font-size: 13px;
+            font-weight: 400;
+            color: #8a86a8;
+            letter-spacing: -0.01em;
+            -webkit-text-fill-color: #8a86a8;
+        }
+        .cue-count {
+            font-size: 14px;
+            font-weight: 500;
+            color: #b8b0d8;
+            background: rgba(124, 77, 255, 0.12);
+            padding: 4px 14px;
+            border-radius: 40px;
+            letter-spacing: 0.3px;
+            border: 1px solid rgba(124, 77, 255, 0.15);
+            flex-shrink: 0;
+        }
 
-    h1 {
-      margin: 0 0 6px;
-      font-size: clamp(28px, 5vw, 42px);
-      line-height: 1.05;
-    }
+        /* ── scan button ── */
+        .scan-wrap {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+        .scan-btn {
+            background: rgba(124, 77, 255, 0.18);
+            border: 1px solid rgba(124, 77, 255, 0.25);
+            color: #c8bfff;
+            padding: 6px 16px;
+            border-radius: 40px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+        }
+        .scan-btn:active {
+            transform: scale(0.95);
+            background: rgba(124, 77, 255, 0.30);
+        }
+        .scan-btn svg {
+            width: 16px;
+            height: 16px;
+            fill: currentColor;
+        }
+        .file-input-hidden {
+            display: none;
+        }
 
-    .subtitle {
-      margin: 0;
-      color: var(--muted);
-      font-size: 16px;
-      line-height: 1.45;
-    }
+        /* ── categories ── */
+        .cat-section {
+            flex-shrink: 0;
+            padding: 12px 0 6px;
+        }
+        .cat-scroll {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            padding: 4px 0 8px;
+            scrollbar-width: none;
+            -webkit-overflow-scrolling: touch;
+        }
+        .cat-scroll::-webkit-scrollbar {
+            display: none;
+        }
+        .cat-pill {
+            flex-shrink: 0;
+            padding: 6px 18px;
+            border-radius: 40px;
+            font-size: 13px;
+            font-weight: 500;
+            background: rgba(255, 255, 255, 0.05);
+            color: #9a94b8;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            cursor: pointer;
+            transition: all 0.2s;
+            letter-spacing: 0.2px;
+            touch-action: manipulation;
+        }
+        .cat-pill.active {
+            background: rgba(124, 77, 255, 0.25);
+            color: #e4ddff;
+            border-color: rgba(124, 77, 255, 0.35);
+            box-shadow: 0 0 20px rgba(124, 77, 255, 0.08);
+        }
+        .cat-pill:active {
+            transform: scale(0.95);
+        }
 
-    .panel {
-      background: var(--panel);
-      border: 1px solid #eaecf0;
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      padding: 16px;
-      margin-bottom: 16px;
-    }
+        /* ── shuffle row ── */
+        .shuffle-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-shrink: 0;
+            padding: 6px 0 10px;
+            flex-wrap: wrap;
+        }
+        .shuffle-label {
+            font-size: 15px;
+            font-weight: 600;
+            color: #d4cef0;
+            letter-spacing: -0.01em;
+        }
+        .shuffle-pills {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .shuffle-pills .cat-pill {
+            font-size: 12px;
+            padding: 4px 14px;
+        }
+        .roll-btn {
+            margin-left: auto;
+            background: linear-gradient(135deg, #7c4dff, #536dfe);
+            border: none;
+            color: #fff;
+            padding: 8px 22px;
+            border-radius: 40px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 4px 24px rgba(124, 77, 255, 0.25);
+            touch-action: manipulation;
+            letter-spacing: 0.2px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .roll-btn:active {
+            transform: scale(0.94);
+            box-shadow: 0 2px 12px rgba(124, 77, 255, 0.15);
+        }
+        .roll-btn:disabled {
+            opacity: 0.4;
+            transform: none;
+            box-shadow: none;
+        }
 
-    .controls {
-      display: grid;
-      gap: 14px;
-    }
+        /* ── grid ── */
+        .grid-wrap {
+            flex: 1 1 auto;
+            min-height: 0;
+            overflow-y: auto;
+            padding: 4px 0 8px;
+            margin: 0 -4px;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 10px;
+            padding: 0 4px;
+        }
 
-    .row {
-      display: grid;
-      grid-template-columns: repeat(12, minmax(0, 1fr));
-      gap: 12px;
-      align-items: end;
-    }
+        /* ── cue card ── */
+        .cue-card {
+            background: rgba(255, 255, 255, 0.04);
+            border-radius: 14px;
+            padding: 14px 14px 12px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: all 0.15s;
+            cursor: pointer;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            min-height: 76px;
+            backdrop-filter: blur(2px);
+            -webkit-backdrop-filter: blur(2px);
+            touch-action: manipulation;
+        }
+        .cue-card:active {
+            transform: scale(0.97);
+            background: rgba(255, 255, 255, 0.07);
+            border-color: rgba(124, 77, 255, 0.20);
+        }
+        .cue-card.playing {
+            border-color: rgba(124, 77, 255, 0.50);
+            background: rgba(124, 77, 255, 0.10);
+            box-shadow: 0 0 30px rgba(124, 77, 255, 0.06);
+        }
+        .cue-duration {
+            font-size: 11px;
+            font-weight: 500;
+            color: #8a86b0;
+            background: rgba(0, 0, 0, 0.35);
+            padding: 2px 10px;
+            border-radius: 30px;
+            align-self: flex-start;
+            margin-bottom: 8px;
+            letter-spacing: 0.3px;
+            border: 1px solid rgba(255, 255, 255, 0.04);
+        }
+        .cue-name {
+            font-size: 14px;
+            font-weight: 500;
+            color: #f0edf5;
+            line-height: 1.3;
+            word-break: break-word;
+            flex: 1;
+        }
+        .cue-tag {
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #9a94c8;
+            margin-top: 6px;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 2px 10px;
+            border-radius: 30px;
+            align-self: flex-start;
+            border: 1px solid rgba(255, 255, 255, 0.04);
+        }
+        .cue-type-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 9px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            color: #6a6490;
+            background: rgba(0, 0, 0, 0.30);
+            padding: 2px 10px;
+            border-radius: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.04);
+        }
 
-    .field {
-      grid-column: span 12;
-      min-width: 0;
-    }
+        /* ── empty state ── */
+        .empty-state {
+            grid-column: 1 / -1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 60px 20px;
+            color: #6a6490;
+            text-align: center;
+            gap: 12px;
+        }
+        .empty-state .big-icon {
+            font-size: 48px;
+            opacity: 0.5;
+        }
+        .empty-state h3 {
+            font-weight: 500;
+            color: #b8b0d8;
+            font-size: 18px;
+        }
+        .empty-state p {
+            font-size: 14px;
+            max-width: 300px;
+            color: #6a6490;
+        }
+        .empty-state .scan-btn {
+            margin-top: 8px;
+            padding: 10px 32px;
+            font-size: 15px;
+        }
 
-    @media (min-width: 760px) {
-      .field.folder { grid-column: span 5; }
-      .field.extensions { grid-column: span 4; }
-      .field.sort { grid-column: span 3; }
-      .field.search { grid-column: span 6; }
-      .field.actions { grid-column: span 6; }
-    }
+        /* ── studio ── */
+        .studio {
+            flex-shrink: 0;
+            padding: 10px 0 0;
+            border-top: 1px solid rgba(255, 255, 255, 0.04);
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            flex-wrap: wrap;
+        }
+        .studio-label {
+            font-size: 14px;
+            font-weight: 500;
+            color: #b8b0d8;
+            letter-spacing: -0.01em;
+        }
+        .studio-controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            flex: 1;
+        }
+        .studio-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: #b8b0d8;
+            padding: 5px 16px;
+            border-radius: 30px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s;
+            touch-action: manipulation;
+        }
+        .studio-btn:active {
+            transform: scale(0.94);
+            background: rgba(255, 255, 255, 0.09);
+        }
+        .studio-btn.primary {
+            background: rgba(124, 77, 255, 0.20);
+            border-color: rgba(124, 77, 255, 0.25);
+            color: #d4cef0;
+        }
+        .studio-slider {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 80px;
+            height: 4px;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.10);
+            outline: none;
+            transition: background 0.2s;
+        }
+        .studio-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #7c4dff;
+            cursor: pointer;
+            border: 2px solid rgba(255, 255, 255, 0.15);
+            box-shadow: 0 0 16px rgba(124, 77, 255, 0.20);
+        }
+        .studio-slider::-moz-range-thumb {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #7c4dff;
+            cursor: pointer;
+            border: 2px solid rgba(255, 255, 255, 0.15);
+        }
+        .studio-val {
+            font-size: 12px;
+            color: #8a86a8;
+            min-width: 28px;
+            text-align: center;
+        }
 
-    label {
-      display: block;
-      font-size: 13px;
-      font-weight: 700;
-      margin-bottom: 6px;
-      color: #344054;
-    }
+        /* ── results footer ── */
+        .results-footer {
+            flex-shrink: 0;
+            padding: 8px 0 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            border-top: 1px solid rgba(255, 255, 255, 0.03);
+            margin-top: 4px;
+        }
+        .results-count {
+            font-size: 13px;
+            font-weight: 500;
+            color: #8a86a8;
+        }
+        .results-durs {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            flex: 1;
+        }
+        .dur-pill {
+            font-size: 10px;
+            font-weight: 500;
+            color: #6a6490;
+            background: rgba(255, 255, 255, 0.04);
+            padding: 2px 10px;
+            border-radius: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            letter-spacing: 0.2px;
+        }
+        .dur-pill.active {
+            color: #b8b0d8;
+            border-color: rgba(124, 77, 255, 0.20);
+            background: rgba(124, 77, 255, 0.08);
+        }
 
-    input[type="text"],
-    select {
-      width: 100%;
-      min-height: 46px;
-      border: 1px solid var(--line);
-      border-radius: 12px;
-      padding: 10px 12px;
-      font-size: 16px;
-      background: #fff;
-      color: var(--text);
-      outline: none;
-    }
+        /* ── playing indicator ── */
+        .play-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #7c4dff;
+            margin-right: 6px;
+            animation: pulse-dot 0.8s ease-in-out infinite;
+        }
+        @keyframes pulse-dot {
+            0%,
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+            50% {
+                opacity: 0.3;
+                transform: scale(0.7);
+            }
+        }
 
-    input[type="text"]:focus,
-    select:focus {
-      border-color: #84adff;
-      box-shadow: 0 0 0 4px rgba(23,92,211,.12);
-    }
+        /* ── responsive ── */
+        @media (max-width: 480px) {
+            #app {
+                padding: 12px 12px 10px;
+            }
+            .logo {
+                font-size: 20px;
+            }
+            .logo-sub {
+                font-size: 11px;
+            }
+            .cue-count {
+                font-size: 12px;
+                padding: 3px 12px;
+            }
+            .grid {
+                grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+                gap: 8px;
+            }
+            .cue-card {
+                padding: 12px 12px 10px;
+                min-height: 64px;
+            }
+            .cue-name {
+                font-size: 13px;
+            }
+            .roll-btn {
+                padding: 6px 16px;
+                font-size: 13px;
+            }
+            .studio-slider {
+                width: 56px;
+            }
+            .shuffle-label {
+                font-size: 13px;
+            }
+            .scan-btn {
+                font-size: 12px;
+                padding: 5px 12px;
+            }
+        }
 
-    .button-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
+        @media (max-width: 380px) {
+            .grid {
+                grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+            }
+            .cue-card {
+                min-height: 56px;
+                padding: 10px 10px 8px;
+            }
+            .cue-name {
+                font-size: 12px;
+            }
+        }
 
-    button,
-    .folder-button {
-      min-height: 46px;
-      border: 0;
-      border-radius: 12px;
-      padding: 10px 14px;
-      font-size: 15px;
-      font-weight: 700;
-      cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
-    }
+        /* ── safe area ── */
+        @supports (padding: max(0px)) {
+            #app {
+                padding-left: max(18px, env(safe-area-inset-left));
+                padding-right: max(18px, env(safe-area-inset-right));
+                padding-top: max(16px, env(safe-area-inset-top));
+                padding-bottom: max(12px, env(safe-area-inset-bottom));
+            }
+        }
 
-    button:disabled {
-      opacity: .45;
-      cursor: not-allowed;
-    }
-
-    .primary,
-    .folder-button {
-      background: var(--accent);
-      color: white;
-    }
-
-    .primary:active,
-    .folder-button:active {
-      background: var(--accent-dark);
-    }
-
-    .secondary {
-      background: #eef4ff;
-      color: #1849a9;
-    }
-
-    .ghost {
-      background: #f2f4f7;
-      color: #344054;
-    }
-
-    .danger {
-      background: #fef3f2;
-      color: var(--danger);
-    }
-
-    #folderInput {
-      position: absolute;
-      opacity: 0;
-      pointer-events: none;
-      width: 1px;
-      height: 1px;
-    }
-
-    .folder-meta {
-      margin-top: 8px;
-      font-size: 13px;
-      color: var(--muted);
-      word-break: break-word;
-    }
-
-    .status {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px 18px;
-      align-items: center;
-      color: var(--muted);
-      font-size: 14px;
-    }
-
-    .status strong {
-      color: var(--text);
-    }
-
-    .success { color: var(--success); }
-    .error { color: var(--danger); }
-
-    .table-wrap {
-      overflow: auto;
-      max-height: 65vh;
-      border: 1px solid #eaecf0;
-      border-radius: 12px;
-      -webkit-overflow-scrolling: touch;
-    }
-
-    table {
-      width: 100%;
-      border-collapse: separate;
-      border-spacing: 0;
-      min-width: 780px;
-      background: white;
-    }
-
-    th, td {
-      padding: 11px 12px;
-      text-align: left;
-      border-bottom: 1px solid #eaecf0;
-      font-size: 14px;
-      vertical-align: top;
-    }
-
-    th {
-      position: sticky;
-      top: 0;
-      z-index: 2;
-      background: #f9fafb;
-      color: #344054;
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: .03em;
-    }
-
-    tbody tr:last-child td {
-      border-bottom: 0;
-    }
-
-    tbody tr:active {
-      background: #f9fafb;
-    }
-
-    .name {
-      font-weight: 700;
-      color: #101828;
-      word-break: break-word;
-    }
-
-    .path {
-      color: var(--muted);
-      word-break: break-word;
-    }
-
-    .chip {
-      display: inline-block;
-      border-radius: 999px;
-      padding: 3px 8px;
-      background: #eef4ff;
-      color: #1849a9;
-      font-size: 12px;
-      font-weight: 700;
-    }
-
-    .empty {
-      text-align: center;
-      padding: 40px 18px;
-      color: var(--muted);
-    }
-
-    .note {
-      font-size: 13px;
-      line-height: 1.5;
-      color: var(--muted);
-      margin: 10px 0 0;
-    }
-
-    .footer {
-      color: var(--muted);
-      font-size: 12px;
-      text-align: center;
-      padding-top: 4px;
-    }
-
-    @media (max-width: 600px) {
-      body { padding-left: 10px; padding-right: 10px; }
-      .panel { padding: 12px; border-radius: 14px; }
-      .button-row > * { flex: 1 1 auto; }
-    }
-  </style>
+        /* ── toast ── */
+        .toast {
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            background: rgba(20, 16, 40, 0.92);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            padding: 10px 24px;
+            border-radius: 40px;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            color: #d4cef0;
+            font-size: 14px;
+            font-weight: 500;
+            opacity: 0;
+            transition: all 0.35s ease;
+            pointer-events: none;
+            z-index: 100;
+            box-shadow: 0 8px 40px rgba(0, 0, 0, 0.50);
+            white-space: nowrap;
+        }
+        .toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+    </style>
 </head>
 <body>
-  <main class="app">
-    <header>
-      <h1>iPad File Finder</h1>
-      <p class="subtitle">
-        Select a folder from the Files app, scan its subfolders, filter by extension,
-        sort the results, and export the file list.
-      </p>
-    </header>
 
-    <section class="panel controls" aria-label="Search controls">
-      <div class="row">
-        <div class="field folder">
-          <label>1. Choose a folder</label>
-          <label class="folder-button" for="folderInput">Choose Folder</label>
-          <input id="folderInput" type="file" webkitdirectory directory multiple />
-          <div id="folderMeta" class="folder-meta">No folder selected.</div>
+    <div id="app">
+        <!-- header -->
+        <header class="header">
+            <div class="header-left">
+                <span class="logo">VibeStash</span>
+                <span class="logo-sub">procedurally-synthesized</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                <span class="cue-count" id="cueCount">0 cues</span>
+                <div class="scan-wrap">
+                    <button class="scan-btn" id="scanBtn" aria-label="Scan files">
+                        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>
+                        Scan
+                    </button>
+                    <input type="file" id="fileInput" class="file-input-hidden" accept=".wav,.mid,.midi" multiple webkitdirectory>
+                </div>
+            </div>
+        </header>
+
+        <!-- categories -->
+        <section class="cat-section">
+            <div class="cat-scroll" id="categoryTabs">
+                <button class="cat-pill active" data-cat="All">All</button>
+                <button class="cat-pill" data-cat="Hype">Hype</button>
+                <button class="cat-pill" data-cat="Comedy">Comedy</button>
+                <button class="cat-pill" data-cat="Sad">Sad</button>
+                <button class="cat-pill" data-cat="Suspense">Suspense</button>
+                <button class="cat-pill" data-cat="Transition">Transition</button>
+                <button class="cat-pill" data-cat="Woosh">Woosh</button>
+                <button class="cat-pill" data-cat="WOW">WOW</button>
+            </div>
+        </section>
+
+        <!-- shuffle & discover -->
+        <div class="shuffle-row">
+            <span class="shuffle-label">Shuffle &amp; Discover</span>
+            <div class="shuffle-pills" id="shufflePills">
+                <button class="cat-pill active" data-cat="Any">Any</button>
+                <button class="cat-pill" data-cat="Hype">Hype</button>
+                <button class="cat-pill" data-cat="Comedy">Comedy</button>
+                <button class="cat-pill" data-cat="Sad">Sad</button>
+                <button class="cat-pill" data-cat="Suspense">Suspense</button>
+                <button class="cat-pill" data-cat="Transition">Transition</button>
+                <button class="cat-pill" data-cat="Woosh">Woosh</button>
+                <button class="cat-pill" data-cat="WOW">WOW</button>
+            </div>
+            <button class="roll-btn" id="rollBtn">🎲 Roll a random cue</button>
         </div>
 
-        <div class="field extensions">
-          <label for="extensions">2. File extensions</label>
-          <input
-            id="extensions"
-            type="text"
-            value=".mid, .midi, .wav"
-            placeholder=".mid, .wav, .mp3"
-            autocapitalize="off"
-            autocomplete="off"
-            spellcheck="false"
-          />
+        <!-- grid -->
+        <div class="grid-wrap" id="gridWrap">
+            <div class="grid" id="grid"></div>
         </div>
 
-        <div class="field sort">
-          <label for="sortBy">3. Sort results</label>
-          <select id="sortBy">
-            <option value="name-asc">Name A–Z</option>
-            <option value="name-desc">Name Z–A</option>
-            <option value="path-asc">Location A–Z</option>
-            <option value="path-desc">Location Z–A</option>
-            <option value="ext-asc">Extension A–Z</option>
-            <option value="size-desc">Largest first</option>
-            <option value="size-asc">Smallest first</option>
-            <option value="date-desc">Newest first</option>
-            <option value="date-asc">Oldest first</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="row">
-        <div class="field search">
-          <label for="nameSearch">Optional filename search</label>
-          <input
-            id="nameSearch"
-            type="text"
-            placeholder="e.g. bass, loop, take 01"
-            autocapitalize="off"
-            autocomplete="off"
-            spellcheck="false"
-          />
+        <!-- studio -->
+        <div class="studio">
+            <span class="studio-label">Studio</span>
+            <div class="studio-controls">
+                <button class="studio-btn" id="genBtn">⚡ Generate</button>
+                <button class="studio-btn" id="tweakBtn">🎛 Tweak</button>
+                <button class="studio-btn primary" id="exportBtn">⬇ Export</button>
+                <span style="color:#6a6490;font-size:12px;margin-left:4px;">vol</span>
+                <input type="range" class="studio-slider" id="volSlider" min="0" max="100" value="80">
+                <span class="studio-val" id="volVal">80%</span>
+            </div>
         </div>
 
-        <div class="field actions">
-          <label>Actions</label>
-          <div class="button-row">
-            <button id="refreshBtn" class="primary" disabled>Apply Filters</button>
-            <button id="exportCsvBtn" class="secondary" disabled>Export CSV</button>
-            <button id="exportTxtBtn" class="secondary" disabled>Export TXT</button>
-            <button id="clearBtn" class="danger" disabled>Clear</button>
-          </div>
+        <!-- results footer -->
+        <div class="results-footer">
+            <span class="results-count" id="resultsCount">0 results</span>
+            <div class="results-durs" id="resultsDurs">
+                <span class="dur-pill active">All</span>
+                <span class="dur-pill">1.4s</span>
+                <span class="dur-pill">3.0s</span>
+                <span class="dur-pill">1.6s</span>
+                <span class="dur-pill">90ms</span>
+                <span class="dur-pill">70ms</span>
+                <span class="dur-pill">60ms</span>
+                <span class="dur-pill">50ms</span>
+                <span class="dur-pill">40ms</span>
+                <span class="dur-pill">30ms</span>
+                <span class="dur-pill">20ms</span>
+                <span class="dur-pill">10ms</span>
+                <span class="dur-pill">5ms</span>
+                <span class="dur-pill">1ms</span>
+            </div>
         </div>
-      </div>
-
-      <p class="note">
-        iPadOS does not allow a web page to scan the entire device automatically.
-        You must choose a folder. The app can then list files inside that folder and its subfolders.
-      </p>
-    </section>
-
-    <section class="panel">
-      <div class="status">
-        <span>Selected files: <strong id="selectedCount">0</strong></span>
-        <span>Matching files: <strong id="matchCount">0</strong></span>
-        <span>Total size: <strong id="totalSize">0 B</strong></span>
-        <span id="message" aria-live="polite"></span>
-      </div>
-    </section>
-
-    <section class="panel">
-      <div class="table-wrap">
-        <table aria-label="Matching files">
-          <thead>
-            <tr>
-              <th style="width:28%">Name</th>
-              <th style="width:42%">Location</th>
-              <th style="width:10%">Type</th>
-              <th style="width:10%">Size</th>
-              <th style="width:10%">Modified</th>
-            </tr>
-          </thead>
-          <tbody id="resultsBody">
-            <tr>
-              <td colspan="5" class="empty">
-                Choose a folder to begin.
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-
-    <div class="footer">
-      All processing happens locally in your browser. Files are not uploaded.
     </div>
-  </main>
 
-  <script>
-    (() => {
-      "use strict";
+    <!-- toast -->
+    <div class="toast" id="toast"></div>
 
-      const folderInput = document.getElementById("folderInput");
-      const extensionsInput = document.getElementById("extensions");
-      const nameSearchInput = document.getElementById("nameSearch");
-      const sortBy = document.getElementById("sortBy");
-      const refreshBtn = document.getElementById("refreshBtn");
-      const exportCsvBtn = document.getElementById("exportCsvBtn");
-      const exportTxtBtn = document.getElementById("exportTxtBtn");
-      const clearBtn = document.getElementById("clearBtn");
-      const folderMeta = document.getElementById("folderMeta");
-      const selectedCount = document.getElementById("selectedCount");
-      const matchCount = document.getElementById("matchCount");
-      const totalSize = document.getElementById("totalSize");
-      const message = document.getElementById("message");
-      const resultsBody = document.getElementById("resultsBody");
+    <script>
+        (function() {
+            'use strict';
 
-      let allFiles = [];
-      let visibleFiles = [];
-      let selectedFolderName = "";
+            // ── DOM refs ──
+            const grid = document.getElementById('grid');
+            const fileInput = document.getElementById('fileInput');
+            const scanBtn = document.getElementById('scanBtn');
+            const rollBtn = document.getElementById('rollBtn');
+            const cueCount = document.getElementById('cueCount');
+            const resultsCount = document.getElementById('resultsCount');
+            const categoryTabs = document.getElementById('categoryTabs');
+            const shufflePills = document.getElementById('shufflePills');
+            const volSlider = document.getElementById('volSlider');
+            const volVal = document.getElementById('volVal');
+            const genBtn = document.getElementById('genBtn');
+            const tweakBtn = document.getElementById('tweakBtn');
+            const exportBtn = document.getElementById('exportBtn');
+            const toast = document.getElementById('toast');
 
-      function normaliseExtension(value) {
-        let ext = value.trim().toLowerCase();
-        if (!ext) return "";
-        if (!ext.startsWith(".")) ext = "." + ext;
-        return ext;
-      }
+            // ── state ──
+            let library = []; // { id, name, file, type, duration, category, buffer, midiData, kind }
+            let currentCategory = 'All';
+            let shuffleCategory = 'Any';
+            let currentPlaying = null; // id
+            let audioCtx = null;
+            let activeSource = null;
+            let volume = 0.80;
+            let idCounter = 0;
 
-      function getExtension(name) {
-        const index = name.lastIndexOf(".");
-        if (index <= 0 || index === name.length - 1) return "";
-        return name.slice(index).toLowerCase();
-      }
+            // ── helpers ──
+            function formatDuration(seconds) {
+                if (seconds === undefined || seconds === null || isNaN(seconds)) return '—';
+                if (seconds < 1) return (seconds * 1000).toFixed(0) + 'ms';
+                return seconds.toFixed(1) + 's';
+            }
 
-      function getPath(file) {
-        return file.webkitRelativePath || file.name;
-      }
+            function getFileExtension(name) {
+                const i = name.lastIndexOf('.');
+                return i > 0 ? name.slice(i + 1).toLowerCase() : '';
+            }
 
-      function getFolderPath(file) {
-        const fullPath = getPath(file);
-        const slash = fullPath.lastIndexOf("/");
-        return slash === -1 ? "" : fullPath.slice(0, slash);
-      }
+            function getBaseName(name) {
+                const i = name.lastIndexOf('.');
+                return i > 0 ? name.slice(0, i) : name;
+            }
 
-      function formatBytes(bytes) {
-        if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
-        const units = ["B", "KB", "MB", "GB", "TB"];
-        const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
-        const value = bytes / Math.pow(1024, index);
-        return `${value >= 100 || index === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[index]}`;
-      }
+            function inferType(name) {
+                const n = name.toLowerCase();
+                if (n.includes('stinger') || n.includes('hit') || n.includes('stab') || n.includes('flash') || n.includes(
+                    'power')) return 'ONE-SHOT';
+                if (n.includes('ambient') || n.includes('roar') || n.includes('thunder') || n.includes('pad') || n.includes(
+                    'drone')) return 'AMBIENT';
+                if (n.includes('bass') || n.includes('slam') || n.includes('kick') || n.includes('snare') || n.includes(
+                    'drum') || n.includes('perc')) return 'PERCUSSION';
+                if (n.includes('synth') || n.includes('fanfare') || n.includes('brass') || n.includes('lead') || n.includes(
+                    'arp')) return 'TONAL';
+                if (n.includes('riser') || n.includes('uplift') || n.includes('sweep') || n.includes('build')) return 'RISER';
+                if (n.includes('woosh') || n.includes('swoosh')) return 'WOOSH';
+                return 'ONE-SHOT';
+            }
 
-      function formatDate(timestamp) {
-        if (!timestamp) return "—";
-        try {
-          return new Intl.DateTimeFormat(undefined, {
-            year: "numeric",
-            month: "short",
-            day: "2-digit"
-          }).format(new Date(timestamp));
-        } catch {
-          return "—";
-        }
-      }
+            function inferCategory(name) {
+                const n = name.toLowerCase();
+                if (n.includes('hype') || n.includes('epic') || n.includes('victory') || n.includes('hero')) return 'Hype';
+                if (n.includes('comedy') || n.includes('funny') || n.includes('cartoon') || n.includes('boing')) return 'Comedy';
+                if (n.includes('sad') || n.includes('melancholy') || n.includes('tear') || n.includes('emotional')) return 'Sad';
+                if (n.includes('suspense') || n.includes('tense') || n.includes('dread') || n.includes('mystery')) return
+                'Suspense';
+                if (n.includes('transition') || n.includes('whoosh') || n.includes('sweep')) return 'Transition';
+                if (n.includes('woosh') || n.includes('swoosh') || n.includes('wind')) return 'Woosh';
+                if (n.includes('wow') || n.includes('amazing') || n.includes('awesome')) return 'WOW';
+                return 'All';
+            }
 
-      function escapeHtml(value) {
-        return String(value)
-          .replaceAll("&", "&amp;")
-          .replaceAll("<", "&lt;")
-          .replaceAll(">", "&gt;")
-          .replaceAll('"', "&quot;")
-          .replaceAll("'", "&#039;");
-      }
+            // ── toast ──
+            let toastTimer = null;
 
-      function parseExtensions() {
-        return extensionsInput.value
-          .split(/[,;\s]+/)
-          .map(normaliseExtension)
-          .filter(Boolean);
-      }
+            function showToast(msg) {
+                toast.textContent = msg;
+                toast.classList.add('show');
+                clearTimeout(toastTimer);
+                toastTimer = setTimeout(() => toast.classList.remove('show'), 2500);
+            }
 
-      function applyFilters() {
-        const extensions = parseExtensions();
-        const nameQuery = nameSearchInput.value.trim().toLowerCase();
+            // ── audio context ──
+            function getAudioCtx() {
+                if (!audioCtx) {
+                    audioCtx = new(window.AudioContext || window.webkitAudioContext)();
+                }
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+                return audioCtx;
+            }
 
-        visibleFiles = allFiles.filter(file => {
-          const ext = getExtension(file.name);
-          const matchesExtension = extensions.length === 0 || extensions.includes(ext);
-          const matchesName = !nameQuery || file.name.toLowerCase().includes(nameQuery);
-          return matchesExtension && matchesName;
-        });
+            // ── play WAV ──
+            async function playWAV(file, buffer) {
+                const ctx = getAudioCtx();
+                if (activeSource) {
+                    try { activeSource.stop(); } catch (_) {}
+                    activeSource = null;
+                }
+                try {
+                    const audioBuffer = buffer || await ctx.decodeAudioData(await file.arrayBuffer());
+                    const src = ctx.createBufferSource();
+                    src.buffer = audioBuffer;
+                    const gain = ctx.createGain();
+                    gain.gain.value = volume;
+                    src.connect(gain);
+                    gain.connect(ctx.destination);
+                    src.start(0);
+                    activeSource = src;
+                    return audioBuffer.duration;
+                } catch (e) {
+                    console.warn('WAV playback error:', e);
+                    return null;
+                }
+            }
 
-        const mode = sortBy.value;
-        const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+            // ── play MIDI (simple synth) ──
+            function playMIDI(midiData) {
+                const ctx = getAudioCtx();
+                if (activeSource) {
+                    try { activeSource.stop(); } catch (_) {}
+                    activeSource = null;
+                }
 
-        visibleFiles.sort((a, b) => {
-          const nameA = a.name;
-          const nameB = b.name;
-          const pathA = getPath(a);
-          const pathB = getPath(b);
-          const extA = getExtension(nameA);
-          const extB = getExtension(nameB);
+                try {
+                    const tracks = midiData.tracks || [];
+                    const events = [];
+                    let tempo = 500000; // microseconds per quarter
+                    let ticksPerBeat = midiData.header?.ticksPerBeat || 480;
+                    let totalTicks = 0;
 
-          switch (mode) {
-            case "name-desc": return collator.compare(nameB, nameA);
-            case "path-asc": return collator.compare(pathA, pathB);
-            case "path-desc": return collator.compare(pathB, pathA);
-            case "ext-asc": return collator.compare(extA, extB) || collator.compare(nameA, nameB);
-            case "size-desc": return b.size - a.size || collator.compare(nameA, nameB);
-            case "size-asc": return a.size - b.size || collator.compare(nameA, nameB);
-            case "date-desc": return b.lastModified - a.lastModified || collator.compare(nameA, nameB);
-            case "date-asc": return a.lastModified - b.lastModified || collator.compare(nameA, nameB);
-            case "name-asc":
-            default:
-              return collator.compare(nameA, nameB);
-          }
-        });
+                    for (const track of tracks) {
+                        let tick = 0;
+                        for (const ev of track) {
+                            tick += ev.deltaTime || 0;
+                            if (ev.type === 'meta' && ev.subtype === 'setTempo') {
+                                tempo = ev.microsecondsPerBeat || 500000;
+                            }
+                            if (ev.type === 'noteOn' && ev.velocity > 0) {
+                                events.push({ tick, note: ev.noteNumber, velocity: ev.velocity / 127, on: true });
+                            }
+                            if (ev.type === 'noteOff' || (ev.type === 'noteOn' && ev.velocity === 0)) {
+                                events.push({ tick, note: ev.noteNumber, velocity: 0, on: false });
+                            }
+                            totalTicks = Math.max(totalTicks, tick);
+                        }
+                    }
 
-        renderResults();
-      }
+                    if (events.length === 0) {
+                        showToast('No notes found in MIDI');
+                        return null;
+                    }
 
-      function renderResults() {
-        selectedCount.textContent = String(allFiles.length);
-        matchCount.textContent = String(visibleFiles.length);
-        totalSize.textContent = formatBytes(
-          visibleFiles.reduce((sum, file) => sum + (file.size || 0), 0)
-        );
+                    const usPerTick = tempo / ticksPerBeat;
+                    const startTime = ctx.currentTime;
+                    const noteStates = new Map();
+                    const noteEnds = new Map();
 
-        exportCsvBtn.disabled = visibleFiles.length === 0;
-        exportTxtBtn.disabled = visibleFiles.length === 0;
+                    for (const ev of events) {
+                        const time = startTime + (ev.tick * usPerTick) / 1e6;
+                        if (ev.on) {
+                            const freq = 440 * Math.pow(2, (ev.note - 69) / 12);
+                            const osc = ctx.createOscillator();
+                            const gain = ctx.createGain();
+                            gain.gain.setValueAtTime(ev.velocity * volume * 0.5, time);
+                            gain.gain.exponentialRampToValueAtTime(0.001, time + 0.5);
+                            osc.frequency.setValueAtTime(freq, time);
+                            osc.type = 'sawtooth';
+                            osc.connect(gain);
+                            gain.connect(ctx.destination);
+                            osc.start(time);
+                            const noteId = ev.note + '-' + ev.tick;
+                            noteStates.set(noteId, { osc, gain, stopTime: time + 0.5 });
+                            // schedule stop after 0.5s if no noteOff
+                            setTimeout(() => {
+                                try {
+                                    if (osc) { osc.stop(); }
+                                } catch (_) {}
+                            }, (time - ctx.currentTime + 0.6) * 1000);
+                        } else {
+                            // noteOff: find matching noteOn
+                            for (const [key, val] of noteStates) {
+                                if (key.startsWith(ev.note + '-')) {
+                                    try {
+                                        val.gain.gain.setValueAtTime(0.001, time);
+                                        val.osc.stop(time + 0.01);
+                                    } catch (_) {}
+                                    noteStates.delete(key);
+                                    break;
+                                }
+                            }
+                        }
+                    }
 
-        if (visibleFiles.length === 0) {
-          resultsBody.innerHTML = `
-            <tr>
-              <td colspan="5" class="empty">
-                No matching files found. Try changing the extensions or filename filter.
-              </td>
-            </tr>`;
-          return;
-        }
+                    // cleanup remaining after 1s
+                    setTimeout(() => {
+                        for (const [key, val] of noteStates) {
+                            try { val.osc.stop(); } catch (_) {}
+                        }
+                        noteStates.clear();
+                    }, 1500);
 
-        const rows = visibleFiles.map(file => {
-          const fullPath = getPath(file);
-          const folderPath = getFolderPath(file);
-          const ext = getExtension(file.name) || "—";
+                    const durationSec = (totalTicks * usPerTick) / 1e6;
+                    return durationSec;
 
-          return `
-            <tr>
-              <td>
-                <div class="name">${escapeHtml(file.name)}</div>
-              </td>
-              <td>
-                <div class="path">${escapeHtml(folderPath || selectedFolderName || "Selected folder")}</div>
-                <div class="path" style="font-size:12px;margin-top:3px">${escapeHtml(fullPath)}</div>
-              </td>
-              <td><span class="chip">${escapeHtml(ext)}</span></td>
-              <td>${escapeHtml(formatBytes(file.size))}</td>
-              <td>${escapeHtml(formatDate(file.lastModified))}</td>
-            </tr>`;
-        }).join("");
+                } catch (e) {
+                    console.warn('MIDI playback error:', e);
+                    showToast('MIDI playback error');
+                    return null;
+                }
+            }
 
-        resultsBody.innerHTML = rows;
-      }
+            // ── parse MIDI file ──
+            function parseMIDI(data) {
+                // Very simple MIDI parser
+                const bytes = new Uint8Array(data);
+                let pos = 0;
 
-      function downloadText(filename, content, mimeType) {
-        const blob = new Blob([content], { type: mimeType });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
-      }
+                function readUint32() {
+                    const v = (bytes[pos] << 24) | (bytes[pos + 1] << 16) | (bytes[pos + 2] << 8) | bytes[pos + 3];
+                    pos += 4;
+                    return v;
+                }
 
-      function csvEscape(value) {
-        const text = String(value ?? "");
-        return `"${text.replaceAll('"', '""')}"`;
-      }
+                function readUint16() {
+                    const v = (bytes[pos] << 8) | bytes[pos + 1];
+                    pos += 2;
+                    return v;
+                }
 
-      function exportCsv() {
-        const header = ["Name", "Location", "Full path", "Extension", "Size bytes", "Modified"];
-        const lines = [header.map(csvEscape).join(",")];
+                function readVarInt() {
+                    let value = 0;
+                    let byte;
+                    do {
+                        byte = bytes[pos++];
+                        value = (value << 7) | (byte & 0x7F);
+                    } while (byte & 0x80);
+                    return value;
+                }
 
-        for (const file of visibleFiles) {
-          lines.push([
-            file.name,
-            getFolderPath(file),
-            getPath(file),
-            getExtension(file),
-            file.size,
-            file.lastModified ? new Date(file.lastModified).toISOString() : ""
-          ].map(csvEscape).join(","));
-        }
+                // Header
+                if (bytes[pos] !== 0x4D || bytes[pos + 1] !== 0x54 || bytes[pos + 2] !== 0x68 || bytes[pos + 3] !== 0x64) {
+                    throw new Error('Invalid MIDI header');
+                }
+                pos += 4;
+                const headerLen = readUint32();
+                const format = readUint16();
+                const tracks = readUint16();
+                const ticksPerBeat = readUint16();
 
-        downloadText(
-          `file-search-results-${Date.now()}.csv`,
-          "\uFEFF" + lines.join("\r\n"),
-          "text/csv;charset=utf-8"
-        );
-      }
+                const result = {
+                    header: { format, tracks, ticksPerBeat },
+                    tracks: []
+                };
 
-      function exportTxt() {
-        const lines = [
-          "iPad File Finder Results",
-          `Folder: ${selectedFolderName || "Selected folder"}`,
-          `Files: ${visibleFiles.length}`,
-          ""
-        ];
+                for (let t = 0; t < tracks; t++) {
+                    if (bytes[pos] !== 0x4D || bytes[pos + 1] !== 0x54 || bytes[pos + 2] !== 0x72 || bytes[pos + 3] !== 0x6B) {
+                        throw new Error('Invalid track header');
+                    }
+                    pos += 4;
+                    const trackLen = readUint32();
+                    const endPos = pos + trackLen;
+                    const events = [];
+                    let runningStatus = 0;
 
-        visibleFiles.forEach((file, index) => {
-          lines.push(`${index + 1}. ${getPath(file)}`);
-        });
+                    while (pos < endPos) {
+                        const delta = readVarInt();
+                        let status = bytes[pos++];
+                        if (status < 0x80) {
+                            // Running status
+                            pos--;
+                            status = runningStatus || 0x90;
+                        } else {
+                            runningStatus = status;
+                        }
+                        const cmd = status >> 4;
+                        const channel = status & 0x0F;
 
-        downloadText(
-          `file-search-results-${Date.now()}.txt`,
-          lines.join("\n"),
-          "text/plain;charset=utf-8"
-        );
-      }
+                        if (cmd === 0x8 || cmd === 0x9) {
+                            const note = bytes[pos++];
+                            const vel = bytes[pos++];
+                            events.push({
+                                deltaTime: delta,
+                                type: cmd === 0x9 ? 'noteOn' : 'noteOff',
+                                noteNumber: note,
+                                velocity: vel,
+                                channel
+                            });
+                        } else if (cmd === 0xA || cmd === 0xB || cmd === 0xE) {
+                            pos += 2;
+                        } else if (cmd === 0xC || cmd === 0xD) {
+                            pos += 1;
+                        } else if (status === 0xFF) {
+                            const metaType = bytes[pos++];
+                            const metaLen = readVarInt();
+                            const metaData = bytes.slice(pos, pos + metaLen);
+                            pos += metaLen;
+                            if (metaType === 0x51) {
+                                // Tempo
+                                const tempo = (metaData[0] << 16) | (metaData[1] << 8) | metaData[2];
+                                events.push({ deltaTime: delta, type: 'meta', subtype: 'setTempo', microsecondsPerBeat: tempo });
+                            } else {
+                                events.push({ deltaTime: delta, type: 'meta', subtype: metaType, data: metaData });
+                            }
+                        } else {
+                            // sysex
+                            while (bytes[pos] !== 0xF7 && pos < endPos) pos++;
+                            pos++;
+                        }
+                    }
+                    result.tracks.push(events);
+                }
 
-      function clearAll() {
-        allFiles = [];
-        visibleFiles = [];
-        selectedFolderName = "";
-        folderInput.value = "";
-        folderMeta.textContent = "No folder selected.";
-        selectedCount.textContent = "0";
-        matchCount.textContent = "0";
-        totalSize.textContent = "0 B";
-        message.textContent = "";
-        refreshBtn.disabled = true;
-        exportCsvBtn.disabled = true;
-        exportTxtBtn.disabled = true;
-        clearBtn.disabled = true;
-        resultsBody.innerHTML = `
-          <tr>
-            <td colspan="5" class="empty">
-              Choose a folder to begin.
-            </td>
-          </tr>`;
-      }
+                return result;
+            }
 
-      folderInput.addEventListener("change", () => {
-        const files = Array.from(folderInput.files || []);
-        allFiles = files;
+            // ── process files ──
+            async function processFiles(fileList) {
+                const valid = [];
+                for (const file of fileList) {
+                    const ext = getFileExtension(file.name);
+                    if (ext === 'wav' || ext === 'mid' || ext === 'midi') {
+                        valid.push(file);
+                    }
+                }
 
-        if (!files.length) {
-          clearAll();
-          return;
-        }
+                if (valid.length === 0) {
+                    showToast('No WAV or MIDI files found');
+                    return;
+                }
 
-        const firstPath = getPath(files[0]);
-        selectedFolderName = firstPath.includes("/") ? firstPath.split("/")[0] : "Selected folder";
-        folderMeta.textContent = `${selectedFolderName} — ${files.length} file${files.length === 1 ? "" : "s"} available`;
-        refreshBtn.disabled = false;
-        clearBtn.disabled = false;
-        message.textContent = "Folder loaded.";
-        message.className = "success";
+                showToast(`Scanning ${valid.length} files…`);
 
-        applyFilters();
-      });
+                const newItems = [];
+                for (const file of valid) {
+                    const id = ++idCounter;
+                    const name = getBaseName(file.name);
+                    const ext = getFileExtension(file.name);
+                    const kind = ext === 'wav' ? 'wav' : 'midi';
+                    const type = inferType(name);
+                    const category = inferCategory(name);
+                    let duration = null;
+                    let buffer = null;
+                    let midiData = null;
 
-      refreshBtn.addEventListener("click", applyFilters);
-      sortBy.addEventListener("change", applyFilters);
-      extensionsInput.addEventListener("input", () => {
-        if (allFiles.length) applyFilters();
-      });
-      nameSearchInput.addEventListener("input", () => {
-        if (allFiles.length) applyFilters();
-      });
-      exportCsvBtn.addEventListener("click", exportCsv);
-      exportTxtBtn.addEventListener("click", exportTxt);
-      clearBtn.addEventListener("click", clearAll);
+                    try {
+                        if (kind === 'wav') {
+                            const ctx = getAudioCtx();
+                            const arrayBuf = await file.arrayBuffer();
+                            buffer = await ctx.decodeAudioData(arrayBuf);
+                            duration = buffer.duration;
+                        } else {
+                            const arrayBuf = await file.arrayBuffer();
+                            midiData = parseMIDI(arrayBuf);
+                            // estimate duration from MIDI
+                            if (midiData && midiData.tracks) {
+                                let maxTick = 0;
+                                for (const track of midiData.tracks) {
+                                    let tick = 0;
+                                    for (const ev of track) {
+                                        tick += ev.deltaTime || 0;
+                                        maxTick = Math.max(maxTick, tick);
+                                    }
+                                }
+                                const tempo = 500000;
+                                const ticksPerBeat = midiData.header?.ticksPerBeat || 480;
+                                duration = (maxTick * tempo) / (ticksPerBeat * 1e6);
+                                if (duration < 0.1) duration = 0.5;
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('Error processing', file.name, e);
+                        duration = null;
+                    }
 
-      if (!("webkitdirectory" in folderInput)) {
-        message.textContent = "This browser may not support folder selection.";
-        message.className = "error";
-      }
-    })();
-  </script>
+                    newItems.push({
+                        id,
+                        name,
+                        file,
+                        kind,
+                        type,
+                        category,
+                        duration: duration || 0.5,
+                        buffer,
+                        midiData,
+                        _raw: file
+                    });
+                }
+
+                library = library.concat(newItems);
+                renderGrid();
+                updateCounts();
+                showToast(`Imported ${newItems.length} files`);
+            }
+
+            // ── render ──
+            function renderGrid() {
+                const cat = currentCategory;
+                let filtered = cat === 'All' ? library : library.filter(item => item.category === cat || item.category === 'All');
+
+                if (filtered.length === 0) {
+                    grid.innerHTML = `
+                        <div class="empty-state">
+                            <div class="big-icon">🎵</div>
+                            <h3>No cues yet</h3>
+                            <p>Tap “Scan” to import WAV and MIDI files from your iPad.</p>
+                            <button class="scan-btn" id="emptyScanBtn" style="padding:10px 32px;font-size:15px;">📂 Scan Files</button>
+                        </div>
+                    `;
+                    const emptyBtn = document.getElementById('emptyScanBtn');
+                    if (emptyBtn) emptyBtn.addEventListener('click', () => fileInput.click());
+                    return;
+                }
+
+                let html = '';
+                for (const item of filtered) {
+                    const isPlaying = currentPlaying === item.id;
+                    const durStr = formatDuration(item.duration);
+                    const catLabel = item.category !== 'All' ? item.category : '';
+                    html += `
+                        <div class="cue-card ${isPlaying ? 'playing' : ''}" data-id="${item.id}">
+                            ${isPlaying ? '<span class="play-indicator"></span>' : ''}
+                            <span class="cue-duration">${durStr}</span>
+                            <span class="cue-name">${item.name}</span>
+                            <span class="cue-tag">${item.type}</span>
+                            <span class="cue-type-badge">${item.kind === 'wav' ? 'WAV' : 'MIDI'}</span>
+                        </div>
+                    `;
+                }
+                grid.innerHTML = html;
+
+                // click handlers
+                grid.querySelectorAll('.cue-card').forEach(el => {
+                    el.addEventListener('click', function(e) {
+                        const id = parseInt(this.dataset.id, 10);
+                        const item = library.find(i => i.id === id);
+                        if (item) playItem(item);
+                    });
+                });
+            }
+
+            function updateCounts() {
+                const total = library.length;
+                const cat = currentCategory;
+                const filtered = cat === 'All' ? library : library.filter(item => item.category === cat || item.category === 'All');
+                cueCount.textContent = `${total} cue${total !== 1 ? 's' : ''}`;
+                resultsCount.textContent = `${filtered.length} result${filtered.length !== 1 ? 's' : ''}`;
+            }
+
+            // ── play item ──
+            async function playItem(item) {
+                if (currentPlaying === item.id) {
+                    // stop
+                    if (activeSource) {
+                        try { activeSource.stop(); } catch (_) {}
+                        activeSource = null;
+                    }
+                    currentPlaying = null;
+                    renderGrid();
+                    return;
+                }
+
+                // stop any current
+                if (activeSource) {
+                    try { activeSource.stop(); } catch (_) {}
+                    activeSource = null;
+                }
+
+                const ctx = getAudioCtx();
+                let dur = null;
+
+                try {
+                    if (item.kind === 'wav') {
+                        if (item.buffer) {
+                            dur = await playWAV(item.file, item.buffer);
+                        } else {
+                            const buf = await ctx.decodeAudioData(await item.file.arrayBuffer());
+                            item.buffer = buf;
+                            dur = await playWAV(item.file, buf);
+                        }
+                    } else {
+                        if (!item.midiData) {
+                            const data = await item.file.arrayBuffer();
+                            item.midiData = parseMIDI(data);
+                        }
+                        dur = playMIDI(item.midiData);
+                    }
+                } catch (e) {
+                    console.warn('Play error:', e);
+                    showToast('Playback error');
+                    return;
+                }
+
+                if (dur !== null && dur !== undefined) {
+                    currentPlaying = item.id;
+                    renderGrid();
+                    // auto-stop after duration + 0.5s
+                    const stopDelay = (dur + 0.5) * 1000;
+                    setTimeout(() => {
+                        if (currentPlaying === item.id) {
+                            if (activeSource) {
+                                try { activeSource.stop(); } catch (_) {}
+                                activeSource = null;
+                            }
+                            currentPlaying = null;
+                            renderGrid();
+                        }
+                    }, stopDelay);
+                } else {
+                    showToast('Playback failed');
+                }
+            }
+
+            // ── shuffle ──
+            function doShuffle() {
+                const cat = shuffleCategory;
+                let pool = cat === 'Any' ? library : library.filter(item => item.category === cat || item.category === 'All');
+                if (pool.length === 0) {
+                    showToast('No cues in this category');
+                    return;
+                }
+                const idx = Math.floor(Math.random() * pool.length);
+                const item = pool[idx];
+                playItem(item);
+                showToast(`🎲 Shuffled: ${item.name}`);
+            }
+
+            // ── category filter ──
+            function setCategory(cat) {
+                currentCategory = cat;
+                categoryTabs.querySelectorAll('.cat-pill').forEach(el => {
+                    el.classList.toggle('active', el.dataset.cat === cat);
+                });
+                renderGrid();
+                updateCounts();
+            }
+
+            function setShuffleCategory(cat) {
+                shuffleCategory = cat;
+                shufflePills.querySelectorAll('.cat-pill').forEach(el => {
+                    el.classList.toggle('active', el.dataset.cat === cat);
+                });
+            }
+
+            // ── init ──
+            function init() {
+                // category tabs
+                categoryTabs.addEventListener('click', function(e) {
+                    const btn = e.target.closest('.cat-pill');
+                    if (btn && btn.dataset.cat) {
+                        setCategory(btn.dataset.cat);
+                    }
+                });
+
+                // shuffle pills
+                shufflePills.addEventListener('click', function(e) {
+                    const btn = e.target.closest('.cat-pill');
+                    if (btn && btn.dataset.cat) {
+                        setShuffleCategory(btn.dataset.cat);
+                    }
+                });
+
+                // roll
+                rollBtn.addEventListener('click', doShuffle);
+
+                // scan
+                scanBtn.addEventListener('click', () => {
+                    fileInput.click();
+                });
+
+                fileInput.addEventListener('change', function(e) {
+                    if (this.files && this.files.length) {
+                        processFiles(this.files);
+                    }
+                    this.value = '';
+                });
+
+                // volume
+                volSlider.addEventListener('input', function() {
+                    volume = parseFloat(this.value) / 100;
+                    volVal.textContent = this.value + '%';
+                    if (activeSource) {
+                        // update gain if possible
+                    }
+                });
+
+                // studio buttons
+                genBtn.addEventListener('click', () => showToast('✨ Generate: coming soon'));
+                tweakBtn.addEventListener('click', () => showToast('🎛 Tweak panel: coming soon'));
+                exportBtn.addEventListener('click', () => {
+                    if (library.length === 0) {
+                        showToast('No files to export');
+                        return;
+                    }
+                    showToast(`⬇ Exporting ${library.length} cues… (demo)`);
+                });
+
+                // initial empty state
+                renderGrid();
+                updateCounts();
+
+                // auto-detect: if there's a file input with directory, handle it
+                // also handle drag and drop?
+                // For iOS, we use the file picker.
+
+                // prevent zoom on double tap
+                document.addEventListener('dblclick', function(e) {
+                    e.preventDefault();
+                }, { passive: false });
+
+                // also prevent gesture zoom
+                document.addEventListener('gesturestart', function(e) {
+                    e.preventDefault();
+                }, { passive: false });
+
+                // load any previously stored? no.
+
+                // If the user has the "Files" app integration, they can select files.
+                showToast('Tap “Scan” to import WAV & MIDI files');
+            }
+
+            // ── start ──
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', init);
+            } else {
+                init();
+            }
+
+        })();
+    </script>
+
 </body>
 </html>
